@@ -1,0 +1,147 @@
+version: '3'
+services:
+  user_service:
+    build: ./backend/user_service
+    environment:
+      - NODE_ENV=production
+      - ENV_FILE=.env.user_service
+      - SERVICE_URL_EVEN=http://localhost:9002/api/v1/
+      - SERVICE_URL_CONTRAT=http://localhost:9001/api/v1/  
+    network_mode: "host"
+    ports:
+      - "9000:9000"
+    volumes:
+      - ./backend/user_service:/app
+    restart: always
+
+  contrat_service:
+    build: ./backend/contrat_service
+    environment:
+      - NODE_ENV=production
+      - ENV_FILE=.env.contrat_service
+      - SERVICE_URL_USER=http://localhost:9000/api/v1/  
+      - SERVICE_URL_EVEN=http://localhost:9002/api/v1/  
+    network_mode: "host"
+    ports:
+      - "9001:9001"
+    volumes:
+      - ./backend/contrat_service:/app
+    restart: always
+
+  event_service:
+    build: ./backend/event_service
+    environment:
+      - NODE_ENV=production
+      - ENV_FILE=.env.event_service
+      - SERVICE_URL_USER=http://localhost:9000/api/v1/  
+      - SERVICE_URL_CONTRAT=http://localhost:9001/api/v1/  
+    network_mode: "host"
+    ports:
+      - "9003:9003"
+    volumes:
+      - ./backend/event_service:/app
+    restart: always
+
+
+# pour la fin des prod
+
+
+
+# version: '3.8'
+
+# services:
+#   user_service:
+#     build: ./backend/user_service
+#     environment:
+#       NODE_ENV: development
+#       ENV_FILE: .env.user_service
+#       SERVICE_URL_EVEN: http://event_service:9002/api/v1/
+#       SERVICE_URL_CONTRAT: http://contrat_service:9001/api/v1/
+#     networks:
+#       - service_mynetwork
+#     ports:
+#       - "9000:9000"
+#     volumes:
+#       - ./backend/user_service:/app
+#     restart: unless-stopped
+
+#   contrat_service:
+#     build: ./backend/contrat_service
+#     environment:
+#       NODE_ENV: development
+#       ENV_FILE: .env.contrat_service
+#       SERVICE_URL_USER: http://user_service:9000/api/v1/
+#       SERVICE_URL_EVEN: http://event_service:9002/api/v1/
+#       # SERVICE_URL_WALLET: http://kivema_wallet:8004/api/v1/
+#     networks:
+#       - service_mynetwork
+#     ports:
+#       - "9001:9001"
+#     volumes:
+#       - ./backend/contrat_service:/app
+#     restart: unless-stopped
+
+#   event_service:
+#     build: ./backend/event_service
+#     environment:
+#       NODE_ENV: development
+#       ENV_FILE: .env.event_service
+#       SERVICE_URL_USER: http://user_service:9000/api/v1/
+#       SERVICE_URL_CONTRAT: http://contrat_service:9001/api/v1/
+#       # SERVICE_URL_WALLET: http://kivema_wallet:8004/api/v1/
+#     networks:
+#       - service_mynetwork
+#     ports:
+#       - "9002:9002"
+#     volumes:
+#       - ./backend/event_service:/app
+#     restart: unless-stopped
+
+  # logstash:
+  #   image: docker.elastic.co/logstash/logstash:8.13.2
+  #   container_name: logstash
+  #   ports:
+  #     - "9061:9061"
+  #   volumes:
+  #     - ./logstash/pipeline:/usr/share/logstash/pipeline:ro
+  #     - ./backend/event_service/logs:/logs
+  #   depends_on:
+  #     - elasticsearch
+  #   networks:
+  #     - service_mynetwork
+  #   restart: unless-stopped
+
+  # elasticsearch:
+  #   image: docker.elastic.co/elasticsearch/elasticsearch:8.13.2
+  #   container_name: elasticsearch
+  #   environment:
+  #     discovery.type: single-node
+  #     xpack.security.enabled: "false"
+  #     ES_JAVA_OPTS: "-Xms1g -Xmx1g"  # limiter la mémoire java si nécessaire
+  #   ports:
+  #     - "9200:9200"
+  #   networks:
+  #     - service_mynetwork
+  #   volumes:
+  #     - esdata:/usr/share/elasticsearch/data
+  #   restart: unless-stopped
+
+  # kibana:
+  #   image: docker.elastic.co/kibana/kibana:8.13.2
+  #   container_name: kibana
+  #   ports:
+  #     - "9601:5601"  # mapping port local 9601 vers 5601 container
+  #   depends_on:
+  #     - elasticsearch
+  #   networks:
+  #     - service_mynetwork
+  #   environment:
+  #     ELASTICSEARCH_HOSTS: "http://elasticsearch:9200"
+  #   restart: unless-stopped
+
+# networks:
+#   service_mynetwork:
+#     driver: bridge
+
+# volumes:
+#   esdata:
