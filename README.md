@@ -194,7 +194,7 @@ Pour toute question ou problème, veuillez contacter l'équipe de développement
 <img width="2560" height="1440" alt="Screenshot 2025-09-20 at 10 26 39" src="https://github.com/user-attachments/assets/0ff294c4-29bc-4af8-80e5-f1cad9e44245" />
 
 
-
+<img width="2560" height="1440" alt="Screenshot 2025-09-20 at 10 26 57" src="https://github.com/user-attachments/assets/f0998e3e-9481-4c7a-8b62-3f15081ee1e4" />
 
 
 
