@@ -6,9 +6,13 @@
         <p>Remplissez le formulaire ci-dessous pour rejoindre notre communauté d'influenceurs</p>
         
         <InfluencerForm
+          ref="influencerFormRef"
           :loading="loading"
           :error="error"
-          @submit="handleSubmit"
+          :show-cancel="true"
+          @submit-basic="handleBasicSubmit"
+          @submit-social="handleSocialSubmit"
+          @cancel="handleCancel"
         />
         
         <div v-if="success" class="success-message">
@@ -22,27 +26,63 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useInfluencerStore } from '@/stores/influencers'
-import InfluencerForm from '@/components/Auth/InfluencerForm.vue'
+import InfluencerForm from '@/components/Auth/InfluencerForm.vue' // Chemin corrigé
+import router from '@/router'
 
 const influencerStore = useInfluencerStore()
+const influencerFormRef = ref<InstanceType<typeof InfluencerForm> | null>(null)
 
 const loading = ref(false)
 const error = ref('')
 const success = ref(false)
 
-const handleSubmit = async (formData: any) => {
+const handleBasicSubmit = async (basicData: any) => {
   loading.value = true
   error.value = ''
   success.value = false
   
   try {
-    await influencerStore.createInfluencer(formData)
-    success.value = true
+    // Redirection ou message de succès
+    console.log('Inscription complétée avec succès!', basicData)
+    const result = await influencerStore.createInfluencer(basicData)
+
+    // Redirection ou message de succès
+    console.log('Inscription complétée avec succès!')
+    
+    // Passer l'ID utilisateur au formulaire pour l'étape des réseaux sociaux
+    if (influencerFormRef.value) {
+      influencerFormRef.value.setUserId(result.data.id)
+    }
+    
   } catch (err: any) {
     error.value = err.message || 'Erreur lors de l\'inscription'
   } finally {
     loading.value = false
   }
+}
+
+const handleSocialSubmit = async (socialData: any) => {
+  loading.value = true
+  error.value = ''
+  
+  try {
+    await influencerStore.createSocialAccounts(socialData.accounts)
+    success.value = true
+    
+    setTimeout(() => {
+      router.push('/profile')
+    }, 2000)
+    
+  } catch (err: any) {
+    error.value = err.message || 'Erreur lors de l\'enregistrement des réseaux sociaux'
+  } finally {
+    loading.value = false
+  }
+}
+
+const handleCancel = () => {
+  console.log('Formulaire annulé')
+  // Réinitialiser ou rediriger
 }
 </script>
 

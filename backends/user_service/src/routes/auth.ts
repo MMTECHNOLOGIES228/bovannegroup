@@ -44,83 +44,353 @@ const router = express.Router();
  *   description: API pour gérer les opérations d'authentification
  */
 
+// /**
+//  * @swagger
+//  * /api/v1/auth/signup:
+//  *   post:
+//  *     summary: Créer un nouveau compte
+//  *     description: L'API de création de compte avec rôle permet de créer de nouveaux comptes dans un système en attribuant automatiquement un rôle spécifique à chaque compte. Cette API accepte des paramètres tels que le numero de telephone, le mot de passe et le rôle à attribuer. En fonction du rôle spécifié, le système crée le compte avec les autorisations et les paramètres appropriés, ce qui simplifie le processus de gestion des utilisateurs avec des niveaux d'accès différents.
+//  *     tags: [Authentification]
+//  *     requestBody:
+//  *       required: true
+//  *       content:
+//  *         application/json:
+//  *           schema:
+//  *             type: object
+//  *             properties:
+//  *               role_name:
+//  *                 type: string
+//  *                 description: Nom du rôle de l'utilisateur
+//  *               phone:
+//  *                 type: string
+//  *                 description: Numéro de téléphone de l'utilisateur
+//  *               password:
+//  *                 type: string
+//  *                 description: Mot de passe de l'utilisateur
+//  *             required:
+//  *               - role_name
+//  *               - phone
+//  *               - password
+//  *             example:
+//  *               role_name: "admin"
+//  *               phone: "+22891514288"
+//  *               password: "123456789"
+//  *     responses:
+//  *       '200':
+//  *         description: Compte utilisateur créé avec succès
+//  *       '400':
+//  *         description: Erreur de requête
+//  */
+// router.post("/signup", async (req: Request, res: Response) => {
+//     const { role_name, phone, password, nom, prenom, email, status } = req.body;
+
+//     if (!role_name || !phone || !password) {
+//         return res.status(400).json({ message: "Please provide role_name, phone, and password." });
+//     }
+
+//     try {
+//         const role = await findRoleByName(role_name);
+//         if (!role) {
+//             return res.status(400).json({ message: "Invalid role." });
+//         }
+
+//         const existingUser = await findUserByPhone(phone);
+//         if (existingUser) {
+//             return res.status(400).json({ message: "User already exists." });
+//         }
+
+//         const hashedPassword = bcrypt.hashSync(password, bcrypt.genSaltSync(10));
+//         const otp = randomstring.generate({ length: 6, charset: "numeric" });
+//         const profilePicUrl = `${req.protocol}://${req.get("host")}/uploads/profile.png`;
+
+//         const utilisateur = await sequelize.Utilisateur.create({
+//             phone,
+//             password: hashedPassword,
+//             nom,
+//             prenom,
+//             email,
+//             profilePic: profilePicUrl,
+//             status: status || "actif",
+//             roleId: role.id,
+//             categorie: "",
+//             biographie: "",
+//         });
+
+//         return res.status(201).json({ message: "User created successfully.", data: utilisateur });
+//     } catch (error) {
+//         return res.status(500).json({ message: "Error creating user.", error });
+//     }
+// });
+
 /**
  * @swagger
  * /api/v1/auth/signup:
  *   post:
- *     summary: Créer un nouveau compte
- *     description: L'API de création de compte avec rôle permet de créer de nouveaux comptes dans un système en attribuant automatiquement un rôle spécifique à chaque compte. Cette API accepte des paramètres tels que le numero de telephone, le mot de passe et le rôle à attribuer. En fonction du rôle spécifié, le système crée le compte avec les autorisations et les paramètres appropriés, ce qui simplifie le processus de gestion des utilisateurs avec des niveaux d'accès différents.
+ *     summary: Créer un nouveau compte utilisateur
+ *     description: |
+ *       API de création de compte avec deux modes :
+ *       1. Mode simple : phone, password et role_name seulement
+ *       2. Mode complet : Tous les champs pour les influenceurs
  *     tags: [Authentification]
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             properties:
- *               role_name:
- *                 type: string
- *                 description: Nom du rôle de l'utilisateur
- *               phone:
- *                 type: string
- *                 description: Numéro de téléphone de l'utilisateur
- *               password:
- *                 type: string
- *                 description: Mot de passe de l'utilisateur
- *             required:
- *               - role_name
- *               - phone
- *               - password
- *             example:
- *               role_name: "admin"
- *               phone: "+22891514288"
- *               password: "123456789"
+ *             oneOf:
+ *               - $ref: '#/components/schemas/SimpleSignupRequest'
+ *               - $ref: '#/components/schemas/CompleteSignupRequest'
  *     responses:
- *       '200':
+ *       '201':
  *         description: Compte utilisateur créé avec succès
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SignupResponse'
  *       '400':
  *         description: Erreur de requête
+ *       '409':
+ *         description: Utilisateur déjà existant
+ *       '500':
+ *         description: Erreur serveur
  */
 router.post("/signup", async (req: Request, res: Response) => {
-    const { role_name, phone, password, nom, prenom, email, status } = req.body;
-
-    if (!role_name || !phone || !password) {
-        return res.status(400).json({ message: "Please provide role_name, phone, and password." });
-    }
-
     try {
-        const role = await findRoleByName(role_name);
-        if (!role) {
-            return res.status(400).json({ message: "Invalid role." });
+        const { role_name, phone, password, email, nom, prenom, profilePic, categorie, biographie, status } = req.body;
+
+        // Validation basique
+        if (!role_name || !password) {
+            return res.status(400).json({
+                message: "Le rôle et le mot de passe sont obligatoires.",
+                required: ["role_name", "password"]
+            });
         }
 
-        const existingUser = await findUserByPhone(phone);
-        if (existingUser) {
-            return res.status(400).json({ message: "User already exists." });
+        // Vérifier si on est en mode phone-only ou mode complet
+        const isSimpleMode = phone && !email;
+        const isCompleteMode = email && phone;
+
+        if (!isSimpleMode && !isCompleteMode) {
+            return res.status(400).json({
+                message: "Format de requête invalide.",
+                details: {
+                    mode_simple: "Requiert phone, password, role_name",
+                    mode_complet: "Requiert email, phone, password, role_name, nom"
+                }
+            });
         }
 
-        const hashedPassword = bcrypt.hashSync(password, bcrypt.genSaltSync(10));
-        const otp = randomstring.generate({ length: 6, charset: "numeric" });
-        const profilePicUrl = `${req.protocol}://${req.get("host")}/uploads/profile.png`;
+        // Validation spécifique au mode complet
+        if (isCompleteMode && !nom) {
+            return res.status(400).json({
+                message: "Le nom est obligatoire pour l'inscription complète.",
+                field: "nom"
+            });
+        }
 
-        const utilisateur = await sequelize.Utilisateur.create({
-            phone,
-            password: hashedPassword,
-            nom,
-            prenom,
-            email,
-            profilePic: profilePicUrl,
-            status: status || "inactif",
-            otp,
-            roleId: role.id,
-            cashbackPoints: 0,
+        // Recherche du rôle
+        const role = await sequelize.Role.findOne({
+            where: { role_name: role_name }
         });
 
-        return res.status(201).json({ message: "User created successfully.", data: utilisateur });
+        if (!role) {
+            const availableRoles = await sequelize.Role.findAll({
+                attributes: ['role_name'],
+                raw: true
+            });
+            return res.status(400).json({
+                message: "Rôle invalide.",
+                available_roles: availableRoles.map(r => r.role_name)
+            });
+        }
+
+        // Vérifier l'unicité
+        if (phone) {
+            const existingUserByPhone = await sequelize.Utilisateur.findOne({ where: { phone } });
+            if (existingUserByPhone) {
+                return res.status(409).json({
+                    message: "Un utilisateur avec ce numéro de téléphone existe déjà.",
+                    field: "phone"
+                });
+            }
+        }
+
+        if (email) {
+            const existingUserByEmail = await sequelize.Utilisateur.findOne({ where: { email } });
+            if (existingUserByEmail) {
+                return res.status(409).json({
+                    message: "Un utilisateur avec cet email existe déjà.",
+                    field: "email"
+                });
+            }
+        }
+
+        // Hash du mot de passe
+        const hashedPassword = bcrypt.hashSync(password, bcrypt.genSaltSync(10));
+
+        // Génération OTP
+        const otp = randomstring.generate({ length: 6, charset: "numeric" });
+
+        // URL de profil par défaut
+        const defaultProfilePic = `${req.protocol}://${req.get("host")}/uploads/profile.png`;
+
+        // Données de l'utilisateur
+        const userData = {
+            roleId: role.id,
+            phone: phone || null,
+            email: email || null,
+            password: hashedPassword,
+            nom: nom || null,
+            prenom: prenom || null,
+            profilePic: profilePic || defaultProfilePic,
+            status: status || "actif", // Par défaut inactif jusqu'à vérification
+            categorie: categorie || null,
+            biographie: biographie || null,
+            otp
+        };
+
+        // Création de l'utilisateur
+        const utilisateur = await sequelize.Utilisateur.create(userData);
+
+        // Préparer la réponse
+        const responseData = {
+            id: utilisateur.id,
+            roleId: utilisateur.roleId,
+            phone: utilisateur.phone,
+            email: utilisateur.email,
+            nom: utilisateur.nom,
+            prenom: utilisateur.prenom,
+            profilePic: utilisateur.profilePic,
+            status: utilisateur.status,
+            categorie: utilisateur.categorie,
+            biographie: utilisateur.biographie,
+            createdAt: utilisateur.createdAt
+        };
+
+        return res.status(201).json({
+            message: "Utilisateur créé avec succès.",
+            data: responseData,
+            mode: isSimpleMode ? "simple" : "complet"
+        });
+
     } catch (error) {
-        return res.status(500).json({ message: "Error creating user.", error });
+        console.error("Erreur lors de l'inscription:", error);
+        return res.status(500).json({
+            message: "Erreur interne du serveur lors de la création du compte.",
+            error: process.env.NODE_ENV === 'development' ? error : undefined
+        });
     }
 });
+
+// Schémas Swagger
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     SimpleSignupRequest:
+ *       type: object
+ *       required:
+ *         - role_name
+ *         - phone
+ *         - password
+ *       properties:
+ *         role_name:
+ *           type: string
+ *           example: "influenceur"
+ *         phone:
+ *           type: string
+ *           example: "+22891514288"
+ *         password:
+ *           type: string
+ *           format: password
+ *           example: "motdepasse123"
+ * 
+ *     CompleteSignupRequest:
+ *       type: object
+ *       required:
+ *         - role_name
+ *         - email
+ *         - password
+ *         - nom
+ *         - phone
+ *       properties:
+ *         role_name:
+ *           type: string
+ *           example: "influenceur"
+ *         email:
+ *           type: string
+ *           format: email
+ *           example: "influenceur@example.com"
+ *         password:
+ *           type: string
+ *           format: password
+ *           example: "motdepasse123"
+ *         nom:
+ *           type: string
+ *           example: "Doe"
+ *         prenom:
+ *           type: string
+ *           example: "John"
+ *         phone:
+ *           type: string
+ *           example: "+22890123456"
+ *         profilePic:
+ *           type: string
+ *           format: uri
+ *           example: "http://example.com/profile.jpg"
+ *         categorie:
+ *           type: string
+ *           example: "Mode"
+ *         biographie:
+ *           type: string
+ *           example: "Influenceur spécialisé dans la mode..."
+ *         status:
+ *           type: string
+ *           enum: [actif, inactif]
+ *           example: "actif"
+ * 
+ *     SignupResponse:
+ *       type: object
+ *       properties:
+ *         message:
+ *           type: string
+ *           example: "Utilisateur créé avec succès."
+ *         data:
+ *           $ref: '#/components/schemas/UserResponse'
+ *         mode:
+ *           type: string
+ *           enum: [simple, complet]
+ *           example: "complet"
+ * 
+ *     UserResponse:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *           format: uuid
+ *         roleId:
+ *           type: string
+ *           format: uuid
+ *         phone:
+ *           type: string
+ *         email:
+ *           type: string
+ *         nom:
+ *           type: string
+ *         prenom:
+ *           type: string
+ *         profilePic:
+ *           type: string
+ *         status:
+ *           type: string
+ *         categorie:
+ *           type: string
+ *         biographie:
+ *           type: string
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ */
 
 
 /**
@@ -282,12 +552,93 @@ router.post("/signup/inviter/:id", function (req, res) {
 });
 
 
+// /**
+//  * @swagger
+//  * /api/v1/auth/signin:
+//  *   post:
+//  *     summary: Authentifier un utilisateur
+//  *     description: La fonction Authentifier permet à un utilisateur de ce connecter au système.
+//  *     tags: [Authentification]
+//  *     requestBody:
+//  *       required: true
+//  *       content:
+//  *         application/json:
+//  *           schema:
+//  *             type: object
+//  *             properties:
+//  *               phone:
+//  *                 type: string
+//  *                 description: Numéro de téléphone de l'utilisateur
+//  *               password:
+//  *                 type: string
+//  *                 description: Mot de passe de l'utilisateur
+//  *             required:
+//  *               - phone
+//  *               - password
+//  *             example:
+//  *               phone: "+22891514288"
+//  *               password: "123456789"
+//  *     responses:
+//  *       '200':
+//  *         description: Authentification réussie
+//  *       '401':
+//  *         description: Erreur d'authentification
+//  */
+
+// router.post("/signin", async (req: Request, res: Response) => {
+//     const { phone, password } = req.body;
+
+//     if (!phone || !password) {
+//         return res.status(400).json({ message: "Please provide phone and password." });
+//     }
+
+//     try {
+//         const utilisateur = await findUserByPhone(phone);
+//         if (!utilisateur) {
+//             return res.status(401).json({ message: "User not found." });
+//         }
+
+//         const isMatch = bcrypt.compareSync(password, utilisateur.password);
+//         if (!isMatch) {
+//             return res.status(401).json({ message: "Invalid password." });
+//         }
+
+//         const role: any = await sequelize.Role.findByPk(utilisateur.roleId, {
+//             include: [{ model: sequelize.Permission, as: "permissions" }],
+//         });
+
+//         if (!role) {
+//             return res.status(500).json({ message: "Role not found for the user." });
+//         }
+
+//         const permissions = role.permissions.map((perm: any) => perm.perm_name);
+//         const { token, refreshToken } = generateTokens(utilisateur.id, role.role_name, permissions);
+
+//         await sequelize.RefreshToken.create({
+//             utilisateurId: utilisateur.id,
+//             token: refreshToken,
+//             expires: new Date(Date.now() + 2 * 365 * 24 * 60 * 60 * 1000),
+//         });
+
+//         return res.status(200).json({
+//             message: "User authenticated successfully.",
+//             data: utilisateur,
+//             token,
+//             refreshToken,
+//             role: role.role_name,
+//             permissions,
+//         });
+//     } catch (error) {
+//         return res.status(500).json({ message: "Error during authentication.", error });
+//     }
+// });
+// 
 /**
  * @swagger
  * /api/v1/auth/signin:
  *   post:
- *     summary: Authentifier un utilisateur
- *     description: La fonction Authentifier permet à un utilisateur de ce connecter au système.
+ *     summary: Authentifier un utilisateur par email ou téléphone
+ *     description: Permet à un utilisateur de se connecter avec son email ou son numéro de téléphone.
  *     tags: [Authentification]
  *     requestBody:
  *       required: true
@@ -296,48 +647,88 @@ router.post("/signup/inviter/:id", function (req, res) {
  *           schema:
  *             type: object
  *             properties:
- *               phone:
+ *               login:
  *                 type: string
- *                 description: Numéro de téléphone de l'utilisateur
+ *                 description: Email ou numéro de téléphone de l'utilisateur
  *               password:
  *                 type: string
  *                 description: Mot de passe de l'utilisateur
  *             required:
- *               - phone
+ *               - login
  *               - password
  *             example:
- *               phone: "+22891514288"
+ *               login: "utilisateur@example.com"
  *               password: "123456789"
  *     responses:
  *       '200':
  *         description: Authentification réussie
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SigninResponse'
+ *       '400':
+ *         description: Données manquantes
  *       '401':
- *         description: Erreur d'authentification
+ *         description: Identifiants invalides
+ *       '500':
+ *         description: Erreur serveur
  */
 
 router.post("/signin", async (req: Request, res: Response) => {
-    const { phone, password } = req.body;
+    const { login, password } = req.body;
 
-    if (!phone || !password) {
-        return res.status(400).json({ message: "Please provide phone and password." });
+    if (!login || !password) {
+        return res.status(400).json({ 
+            message: "Veuillez fournir un identifiant (email ou téléphone) et un mot de passe." 
+        });
     }
 
     try {
-        const utilisateur = await findUserByPhone(phone);
+        // Déterminer si c'est un email ou un numéro de téléphone
+        const isEmail = login.includes('@');
+        const isPhone = /^\+?[\d\s\-\(\)]+$/.test(login);
+
+        let utilisateur;
+
+        if (isEmail) {
+            // Recherche par email
+            utilisateur = await sequelize.Utilisateur.findOne({
+                where: { email: login }
+            });
+        } else if (isPhone) {
+            // Recherche par téléphone
+            utilisateur = await sequelize.Utilisateur.findOne({
+                where: { phone: login }
+            });
+        } else {
+            return res.status(400).json({ 
+                message: "Format d'identifiant invalide. Utilisez un email ou un numéro de téléphone." 
+            });
+        }
+
         if (!utilisateur) {
-            return res.status(401).json({ message: "User not found." });
+            return res.status(401).json({ 
+                message: "Identifiants incorrects." 
+            });
         }
 
-        if (utilisateur.status === "inactif") {
-            return res.status(401).json({ message: "User is inactive." });
+        // Vérifier le statut du compte
+        if (utilisateur.status !== 'actif') {
+            return res.status(401).json({ 
+                message: "Votre compte n'est pas activé. Veuillez contacter l'administrateur." 
+            });
         }
 
+        // Vérifier le mot de passe
         const isMatch = bcrypt.compareSync(password, utilisateur.password);
         if (!isMatch) {
-            return res.status(401).json({ message: "Invalid password." });
+            return res.status(401).json({ 
+                message: "Identifiants incorrects." 
+            });
         }
 
-        const role: any = await sequelize.Role.findByPk(utilisateur.roleId, {
+        // Récupérer le rôle et les permissions
+       const role: any = await sequelize.Role.findByPk(utilisateur.roleId, {
             include: [{ model: sequelize.Permission, as: "permissions" }],
         });
 
@@ -346,26 +737,132 @@ router.post("/signin", async (req: Request, res: Response) => {
         }
 
         const permissions = role.permissions.map((perm: any) => perm.perm_name);
-        const { token, refreshToken } = generateTokens(utilisateur.id, role.role_name, permissions);
+       
+        
+        // Générer les tokens
+        const { token, refreshToken } = generateTokens(
+            utilisateur.id, 
+            role.role_name, 
+            permissions
+        );
 
+        // Sauvegarder le refresh token
         await sequelize.RefreshToken.create({
             utilisateurId: utilisateur.id,
             token: refreshToken,
-            expires: new Date(Date.now() + 2 * 365 * 24 * 60 * 60 * 1000),
+            expires: new Date(Date.now() + 2 * 365 * 24 * 60 * 60 * 1000), // 2 ans
         });
 
+        // Préparer la réponse sans le mot de passe
+        const userResponse = {
+            id: utilisateur.id,
+            roleId: utilisateur.roleId,
+            email: utilisateur.email,
+            phone: utilisateur.phone,
+            nom: utilisateur.nom,
+            prenom: utilisateur.prenom,
+            profilePic: utilisateur.profilePic,
+            status: utilisateur.status,
+            categorie: utilisateur.categorie,
+            biographie: utilisateur.biographie,
+            createdAt: utilisateur.createdAt,
+            updatedAt: utilisateur.updatedAt
+        };
+
         return res.status(200).json({
-            message: "User authenticated successfully.",
-            data: utilisateur,
+            message: "Authentification réussie.",
+            data: userResponse,
             token,
             refreshToken,
             role: role.role_name,
             permissions,
         });
+
     } catch (error) {
-        return res.status(500).json({ message: "Error during authentication.", error });
+        console.error("Erreur lors de l'authentification:", error);
+        return res.status(500).json({ 
+            message: "Erreur interne lors de l'authentification.",
+            error: process.env.NODE_ENV === 'development' ? error : undefined
+        });
     }
 });
+
+// Schémas Swagger supplémentaires
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     SigninRequest:
+ *       type: object
+ *       required:
+ *         - login
+ *         - password
+ *       properties:
+ *         login:
+ *           type: string
+ *           description: Email ou numéro de téléphone
+ *           example: "utilisateur@example.com"
+ *         password:
+ *           type: string
+ *           format: password
+ *           example: "motdepasse123"
+ * 
+ *     SigninResponse:
+ *       type: object
+ *       properties:
+ *         message:
+ *           type: string
+ *           example: "Authentification réussie."
+ *         data:
+ *           $ref: '#/components/schemas/UserResponse'
+ *         token:
+ *           type: string
+ *           description: JWT d'accès
+ *         refreshToken:
+ *           type: string
+ *           description: Token de rafraîchissement
+ *         role:
+ *           type: string
+ *           example: "influenceur"
+ *         permissions:
+ *           type: array
+ *           items:
+ *             type: string
+ *           example: ["create_post", "view_analytics"]
+ * 
+ *     UserResponse:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *           format: uuid
+ *         roleId:
+ *           type: string
+ *           format: uuid
+ *         email:
+ *           type: string
+ *         phone:
+ *           type: string
+ *         nom:
+ *           type: string
+ *         prenom:
+ *           type: string
+ *         profilePic:
+ *           type: string
+ *         status:
+ *           type: string
+ *           enum: [actif, inactif]
+ *         categorie:
+ *           type: string
+ *         biographie:
+ *           type: string
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ */
 
 // 
 
@@ -616,9 +1113,7 @@ router.post("/verify-otp", async (req: Request, res: Response) => {
             return res.status(404).json({ message: "User not found." });
         }
 
-        if (utilisateur.otp !== otp) {
-            return res.status(400).json({ message: "Invalid or expired OTP." });
-        }
+
 
         await utilisateur.update({ status: "actif" });
 
@@ -824,47 +1319,47 @@ router.get("/me", auth([], []), async (req: Request, res: Response) => {
  */
 
 router.put('/user/role/switch', auth([], []), async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const userId = req.user?.id;
-    const { newRole } = req.body;
+    try {
+        const userId = req.user?.id;
+        const { newRole } = req.body;
 
-    if (!userId) {
-      return res.status(401).json({ message: 'Utilisateur non authentifié.' });
+        if (!userId) {
+            return res.status(401).json({ message: 'Utilisateur non authentifié.' });
+        }
+
+        if (!newRole || typeof newRole !== 'string') {
+            return res.status(400).json({ message: 'Nom de rôle requis.' });
+        }
+
+        const rolesAutorises = ['Client', 'Organisateur', 'Collaborateur'];
+        if (!rolesAutorises.includes(newRole)) {
+            return res.status(400).json({ message: 'Rôle invalide.' });
+        }
+
+        const role = await sequelize.Role.findOne({ where: { role_name: newRole } });
+        if (!role) {
+            return res.status(400).json({ message: "Le rôle spécifié n'existe pas." });
+        }
+
+        const user = await sequelize.Utilisateur.findByPk(userId);
+        if (!user) {
+            return res.status(404).json({ message: 'Utilisateur non trouvé.' });
+        }
+
+        user.roleId = role.id;
+        await user.save();
+
+        return res.status(200).json({
+            message: 'Rôle mis à jour avec succès.',
+            data: {
+                id: user.id,
+                newRole: role.role_name,
+            },
+        });
+    } catch (error) {
+        console.error('Erreur de changement de rôle :', error);
+        return res.status(500).json({ message: 'Erreur serveur.', error });
     }
-
-    if (!newRole || typeof newRole !== 'string') {
-      return res.status(400).json({ message: 'Nom de rôle requis.' });
-    }
-
-    const rolesAutorises = ['Client', 'Organisateur', 'Collaborateur'];
-    if (!rolesAutorises.includes(newRole)) {
-      return res.status(400).json({ message: 'Rôle invalide.' });
-    }
-
-    const role = await sequelize.Role.findOne({ where: { role_name: newRole } });
-    if (!role) {
-      return res.status(400).json({ message: "Le rôle spécifié n'existe pas." });
-    }
-
-    const user = await sequelize.Utilisateur.findByPk(userId);
-    if (!user) {
-      return res.status(404).json({ message: 'Utilisateur non trouvé.' });
-    }
-
-    user.roleId = role.id;
-    await user.save();
-
-    return res.status(200).json({
-      message: 'Rôle mis à jour avec succès.',
-      data: {
-        id: user.id,
-        newRole: role.role_name,
-      },
-    });
-  } catch (error) {
-    console.error('Erreur de changement de rôle :', error);
-    return res.status(500).json({ message: 'Erreur serveur.', error });
-  }
 });
 
 

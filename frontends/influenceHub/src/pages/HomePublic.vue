@@ -49,18 +49,6 @@
             >
           </div>
           
-          <div class="filter-group">
-            <label for="engagement-min">Taux d'engagement min (%)</label>
-            <input 
-              type="number" 
-              id="engagement-min" 
-              v-model="filters.engagementRateMin" 
-              placeholder="0" 
-              min="0" 
-              max="100"
-            >
-          </div>
-          
           <button @click="applyFilters" class="btn">Appliquer les filtres</button>
         </div>
       </div>
@@ -83,7 +71,7 @@
         <div v-else class="influencers-grid">
           <InfluencerCard 
             v-for="influencer in influencerStore.influencers" 
-            :key="influencer._id" 
+            :key="influencer.id" 
             :influencer="influencer"
           />
         </div>
@@ -94,16 +82,15 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useInfluencerStore } from '../stores/influencers'
-import InfluencerCard from '../components/Auth/InfluencerCard.vue'
+import { useInfluencerStore } from '@/stores/influencers'
+import InfluencerCard from '@/components/Auth/InfluencerCard.vue' // Chemin corrigé
 
 const influencerStore = useInfluencerStore()
 
 const filters = ref({
   category: '',
   followersMin: '',
-  followersMax: '',
-  engagementRateMin: ''
+  followersMax: ''
 })
 
 onMounted(() => {
@@ -137,6 +124,18 @@ const applyFilters = () => {
 .btn-large {
   padding: 1rem 2rem;
   font-size: 1.1rem;
+  background-color: #fff;
+  color: #667eea;
+  border: none;
+  border-radius: 4px;
+  text-decoration: none;
+  display: inline-block;
+  transition: all 0.3s ease;
+}
+
+.btn-large:hover {
+  background-color: #f8f9fa;
+  transform: translateY(-2px);
 }
 
 .filters-section {
@@ -174,6 +173,21 @@ const applyFilters = () => {
   padding: 0.5rem;
   border: 1px solid #ddd;
   border-radius: 4px;
+  min-width: 150px;
+}
+
+.btn {
+  padding: 0.5rem 1rem;
+  background-color: #667eea;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.btn:hover {
+  background-color: #5a67d8;
 }
 
 .influencers-section {
@@ -190,10 +204,20 @@ const applyFilters = () => {
   color: #dc3545;
 }
 
+.no-results {
+  color: #6c757d;
+}
+
 .influencers-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 2rem;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
 }
 
 @media (max-width: 768px) {
@@ -204,6 +228,14 @@ const applyFilters = () => {
   
   .influencers-grid {
     grid-template-columns: 1fr;
+  }
+  
+  .hero h1 {
+    font-size: 2rem;
+  }
+  
+  .hero p {
+    font-size: 1rem;
   }
 }
 </style>

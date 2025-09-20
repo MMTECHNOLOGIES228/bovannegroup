@@ -8,6 +8,7 @@ export interface UtilisateurCreationAttributes extends Optional<UtilisateurAttri
 // Define the Utilisateur model
 export default (sequelize: Sequelize,) => {
     class Utilisateur extends Model<UtilisateurAttributes, UtilisateurCreationAttributes> implements UtilisateurAttributes {
+        
         public id!: string;
         public roleId!: string;
         public email!: string;
@@ -17,8 +18,8 @@ export default (sequelize: Sequelize,) => {
         public phone!: string;
         public profilePic!: string | null;
         public status!: 'inactif' | 'actif' ;
-        public otp!: string;
-        public cashbackPoints!: number;
+        public categorie!: string;
+        public biographie!: string;
 
         // timestamps!
         public readonly createdAt!: Date;
@@ -70,12 +71,12 @@ export default (sequelize: Sequelize,) => {
             defaultValue: 'inactif',
             allowNull: false,
         },
-        otp: {
+        categorie: {
             type: DataTypes.STRING,
             allowNull: true
         },
-        cashbackPoints: {
-            type: DataTypes.INTEGER,
+        biographie: {
+            type: DataTypes.STRING,
             allowNull: true
         },
     }, {

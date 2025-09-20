@@ -1,12 +1,45 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { influencerService } from '../services/api'
+import { userService, socialMediaService } from '../services/api'
+import { useAuthStore } from './auth';
+
+// Définir le type pour un influenceur basé sur la structure de données réelle
+interface Influencer {
+    id: string;
+    roleId: string;
+    email: string;
+    nom: string;
+    prenom: string;
+    phone: string;
+    profilePic: string;
+    status: string;
+    categorie: string;
+    biographie: string;
+    role: {
+        id: string;
+        role_name: string;
+        role_description: string;
+        permissions: any[];
+    };
+    socialMediaAccounts: {
+        id: string;
+        utilisateurId: string;
+        platform: string;
+        accountUrl: string;
+        followers: number;
+    }[];
+    whatsappNumbers: any[];
+    profile: any;
+}
 
 export const useInfluencerStore = defineStore('influencers', () => {
-    const influencers = ref<any[]>([])
-    const currentInfluencer = ref(null)
+    const influencers = ref<Influencer[]>([])
+    const currentInfluencer = ref<Influencer | null>(null)
     const loading = ref(false)
-    const error = ref(null)
+    const error = ref<string | null>(null)
+
+    const authStore = useAuthStore()
+
     const filters = ref({
         category: '',
         followersMin: '',
@@ -19,11 +52,42 @@ export const useInfluencerStore = defineStore('influencers', () => {
         loading.value = true
         error.value = null
         try {
+            console.log('Fetching influencers with filters:', customFilters)
             const appliedFilters = { ...filters.value, ...customFilters }
-            const response = await influencerService.getAll(appliedFilters)
-            influencers.value = response.data
+            const response = await userService.getAll(appliedFilters)
+
+            console.log('Raw API response:', response.data)
+
+            // Vérifiez la structure de la réponse
+            if (response.data && response.data.data) {
+                // Utiliser directement les données de l'API sans transformation excessive
+                influencers.value = response.data.data.map((user: any) => ({
+                    id: user.id,
+                    roleId: user.roleId,
+                    email: user.email,
+                    nom: user.nom,
+                    prenom: user.prenom,
+                    phone: user.phone,
+                    profilePic: user.profilePic,
+                    status: user.status,
+                    categorie: user.categorie,
+                    biographie: user.biographie,
+                    createdAt: user.createdAt,
+                    updatedAt: user.updatedAt,
+                    role: user.role,
+                    socialMediaAccounts: user.socialMediaAccounts || [],
+                    whatsappNumbers: user.whatsappNumbers || [],
+                    profile: user.profile
+                }))
+
+                console.log('Transformed influencers:', influencers.value)
+            } else {
+                throw new Error('Structure de réponse API invalide')
+            }
         } catch (err: any) {
-            error.value = err.response?.data?.message || 'Erreur lors du chargement'
+            console.error('Error in fetchInfluencers:', err)
+            const errorMessage = err.response?.data?.message || err.message || 'Erreur lors du chargement'
+            error.value = errorMessage
             throw err
         } finally {
             loading.value = false
@@ -35,8 +99,62 @@ export const useInfluencerStore = defineStore('influencers', () => {
         loading.value = true
         error.value = null
         try {
-            const response = await influencerService.getById(id)
-            currentInfluencer.value = response.data
+            const response = await userService.getById(id)
+            const user = response.data.data
+
+            // Utiliser directement les données de l'API
+            currentInfluencer.value = {
+                id: user.id,
+                roleId: user.roleId,
+                email: user.email,
+                nom: user.nom,
+                prenom: user.prenom,
+                phone: user.phone,
+                profilePic: user.profilePic,
+                status: user.status,
+                categorie: user.categorie,
+                biographie: user.biographie,
+                role: user.role,
+                socialMediaAccounts: user.socialMediaAccounts || [],
+                whatsappNumbers: user.whatsappNumbers || [],
+                profile: user.profile
+            }
+        } catch (err: any) {
+            error.value = err.response?.data?.message || 'Erreur lors du chargement'
+            throw err
+        } finally {
+            loading.value = false
+        }
+    }
+
+    const fetchInfluencerByMe = async () => {
+        loading.value = true
+        error.value = null
+        try {
+            const response = await userService.getByMe()
+            const user = response.data.data
+
+            // Utiliser directement les données de l'API
+            currentInfluencer.value = {
+                id: user.id,
+                roleId: user.roleId,
+                email: user.email || '',
+                nom: user.nom || '',
+                prenom: user.prenom || '',
+                phone: user.phone || '',
+                profilePic: user.profilePic || '',
+                status: user.status,
+                categorie: user.categorie || '',
+                biographie: user.biographie || ''
+,                role: user.role,
+                socialMediaAccounts: user.socialMediaAccounts || [],
+                whatsappNumbers: user.whatsappNumbers || [],
+                profile: user.profile
+
+            }
+
+            return currentInfluencer.value
+
         } catch (err: any) {
             error.value = err.response?.data?.message || 'Erreur lors du chargement'
             throw err
@@ -46,12 +164,18 @@ export const useInfluencerStore = defineStore('influencers', () => {
     }
 
     // Créer un nouvel influenceur
-    const createInfluencer = async (influencerData: any) => {
+    const createInfluencer = async (userData: any) => {
         loading.value = true
         error.value = null
         try {
-            const response = await influencerService.create(influencerData)
-            influencers.value.push(response.data)
+            // 1. Créer l'utilisateur
+            const response = await userService.create(userData)
+
+            // 2. Connecter automatiquement l'utilisateur
+            await authStore.login({
+                login: userData.email || userData.phone,
+                password: userData.password
+            }, false)
             return response.data
         } catch (err: any) {
             error.value = err.response?.data?.message || 'Erreur lors de la création'
@@ -66,12 +190,12 @@ export const useInfluencerStore = defineStore('influencers', () => {
         loading.value = true
         error.value = null
         try {
-            const response = await influencerService.update(id, influencerData)
-            const index = influencers.value.findIndex((inf: any) => inf._id === id)
+            const response = await userService.update(id, influencerData)
+            const index = influencers.value.findIndex(inf => inf.id === id)
             if (index !== -1) {
                 influencers.value[index] = response.data
             }
-            if (currentInfluencer.value && (currentInfluencer.value as any)._id === id) {
+            if (currentInfluencer.value && currentInfluencer.value.id === id) {
                 currentInfluencer.value = response.data
             }
             return response.data
@@ -88,10 +212,28 @@ export const useInfluencerStore = defineStore('influencers', () => {
         loading.value = true
         error.value = null
         try {
-            await influencerService.delete(id)
-            influencers.value = influencers.value.filter((inf: any) => inf._id !== id)
+            await userService.delete(id)
+            influencers.value = influencers.value.filter(inf => inf.id !== id)
         } catch (err: any) {
             error.value = err.response?.data?.message || 'Erreur lors de la suppression'
+            throw err
+        } finally {
+            loading.value = false
+        }
+    }
+
+    // Créer les comptes de réseaux sociaux
+    const createSocialAccounts = async (accountsData: any) => {
+        loading.value = true
+        error.value = null
+        try {
+            const response = await socialMediaService.createAccounts({
+                accounts: accountsData
+            })
+            console.log('createSocialAccounts API response:', response.data)
+            return response.data
+        } catch (err: any) {
+            error.value = err.response?.data?.message || 'Erreur lors de la création des comptes sociaux'
             throw err
         } finally {
             loading.value = false
@@ -114,6 +256,8 @@ export const useInfluencerStore = defineStore('influencers', () => {
         createInfluencer,
         updateInfluencer,
         deleteInfluencer,
-        updateFilters
+        updateFilters,
+        createSocialAccounts,
+        fetchInfluencerByMe
     }
 })

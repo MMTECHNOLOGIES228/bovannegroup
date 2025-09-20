@@ -9,7 +9,7 @@
           <div class="navbar-menu">
             <router-link to="/" class="nav-link">Accueil</router-link>
             <router-link to="/register" class="nav-link">Devenir influenceur</router-link>
-            <router-link to="/login" class="nav-link">Admin</router-link>
+            <router-link to="/login" class="nav-link">Login</router-link>
           </div>
         </div>
       </nav>
@@ -21,7 +21,7 @@
     
     <footer class="footer">
       <div class="container">
-        <p>&copy; 20 InfluenceHub. Tous droits réservés.</p>
+        <p>&copy; 2025 InfluenceHub. Tous droits réservés.</p>
       </div>
     </footer>
   </div>

@@ -1,10 +1,10 @@
 // src/router/index.ts
-import { createRouter, createWebHistory } from "vue-router";
+import { createRouter, createWebHistory, type RouteLocationNormalized } from "vue-router";
 import HomePublic from "@/pages/HomePublic.vue";
 import LoginForm from "@/components/Auth/LoginForm.vue";
 import AdminDashboard from "@/pages/AdminDashboard.vue";
 import InfluencerProfile from "@/pages/InfluencerProfile.vue";
-import InfluencerRegister from "@/pages/InfluencerRegister.vue"; // Changé depuis components/Auth
+import InfluencerRegister from "@/pages/InfluencerRegister.vue";
 import { useAuthStore } from "@/stores/auth";
 import PublicLayout from "@/layouts/PublicLayout.vue";
 import AdminLayout from "@/layouts/AdminLayout.vue";
@@ -23,11 +23,20 @@ const routes = [
     {
         path: "/admin",
         component: AdminLayout,
-        meta: { requiresAuth: true },
+        meta: {
+            requiresAuth: true,
+            requiredRoles: ["Admin", "Moderator"] // Rôles autorisés
+        },
         children: [
             { path: "", name: "admin.dashboard", component: AdminDashboard },
             { path: "influencer/new", name: "admin.influencer.new", component: () => import("@/pages/AdminInfluencerEdit.vue") },
-            { path: "influencer/:id/edit", name: "admin.influencer.edit", component: () => import("@/pages/AdminInfluencerEdit.vue"), props: true },
+            {
+                path: "influencer/:id/edit",
+                name: "admin.influencer.edit",
+                component: () => import("@/pages/AdminInfluencerEdit.vue"),
+                props: true,
+                meta: { requiredRoles: ["Admin", "Influenceur"] } // Seul l'Admin peut éditer
+            },
         ],
     },
 ];
@@ -38,19 +47,32 @@ const router = createRouter({
 });
 
 // Garde de navigation
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to: RouteLocationNormalized, from, next) => {
     const authStore = useAuthStore();
-    
-    // Initialiser le store si ce n'est pas déjà fait
+
     if (!authStore.isInitialized) {
-        authStore.init();
+        await authStore.init();
     }
-    
+
+    // Vérifier l'authentification
     if (to.meta.requiresAuth && !authStore.isAuthenticated) {
         next({ name: "login", query: { redirect: to.fullPath } });
-    } else {
-        next();
+        return;
     }
+
+    // Vérifier les rôles de manière sécurisée
+    if (to.meta.requiresAuth && to.meta.requiredRoles) {
+        const userRole = authStore.getUserRole();
+        const requiredRoles = to.meta.requiredRoles as string[];
+
+        if (!userRole || !requiredRoles.includes(userRole)) {
+            console.warn(`Accès refusé: rôle ${userRole} non autorisé. Rôles requis:`, requiredRoles);
+            next({ name: "home" });
+            return;
+        }
+    }
+
+    next();
 });
 
 export default router;

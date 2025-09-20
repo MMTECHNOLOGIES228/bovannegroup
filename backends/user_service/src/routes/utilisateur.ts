@@ -26,6 +26,86 @@ import auth, { AuthenticatedRequest } from '../middlewares/auth';
  */
 
 
+// /**
+//  * @swagger
+//  * /api/v1/utilisateur:
+//  *   post:
+//  *     summary: Ajouter un nouvel utilisateur
+//  *     tags: [utilisateur]
+//  *     description: Ajoute un nouvel utilisateur à la base de données.
+//  *     security:
+//  *       - BearerAuth: []
+//  *     requestBody:
+//  *       required: true
+//  *       content:
+//  *         application/json:
+//  *           schema:
+//  *             $ref: '#/components/schemas/CreateUserInput'
+//  *     responses:
+//  *       '200':
+//  *         description: Utilisateur ajouté avec succès
+//  *         content:
+//  *           application/json:
+//  *             schema:
+//  *               $ref: '#/components/schemas/CreateUserResponse'
+//  *       '400':
+//  *         description: Données manquantes
+//  *         content:
+//  *           application/json:
+//  *             example:
+//  *               msg: "Veuillez fournir le nom d'utilisateur, le mot de passe et le role."
+//  *       '500':
+//  *         description: Erreur serveur
+//  *         content:
+//  *           application/json:
+//  *             example:
+//  *               message: "L'utilisateur n'a pas pu être créé. Réessayez."
+//  *               data: {} 
+//  */
+// router.post('/', auth([], []), async (req, res) => {
+//     // 
+//     console.log();
+//     if (
+//         !req.body.role_name ||
+//         !req.body.email ||
+//         !req.body.password ||
+//         !req.body.nom
+//     ) {
+//         res.status(400).send({
+//             msg: "Please pass username, password and name.",
+//         });
+//     } else {
+//         sequelize.Role.findOne({
+//             where: {
+//                 role_name: req.body.role_name,
+//             },
+//         }).then(async (role: any) => {
+//             console.log(role.id);
+//             // Generate OTP
+//             let otp = randomstring.generate({
+//                 length: 6,
+//                 charset: 'numeric'
+//             });
+//             const hashedPassword = bcrypt.hashSync(req.body.password, bcrypt.genSaltSync(10));
+//             sequelize.Utilisateur.create({
+//                 ...req.body,
+//                 password: hashedPassword,
+//                 status: "actif",
+//                 roleId: role.id,
+//             }).then((utilisateur) => {
+//                 const message = `L'utilisateur a été bien cree avec succès`;
+//                 res.json({ message, data: utilisateur });
+//             }).catch((error) => {
+//                 const message = `L'utilisateur n'a pas pu être cree. Réessayez.`;
+//                 res.status(500).json({ message, data: error });
+//             });
+//         }).catch((error) => {
+//             const message = `Le role n'existe pas. Réessayez dans quelques instants.`;
+//             res.status(500).json({ message, data: error });
+//         });
+//     }
+// });
+
 /**
  * @swagger
  * /api/v1/utilisateur:
@@ -42,69 +122,225 @@ import auth, { AuthenticatedRequest } from '../middlewares/auth';
  *           schema:
  *             $ref: '#/components/schemas/CreateUserInput'
  *     responses:
- *       '200':
- *         description: Utilisateur ajouté avec succès
+ *       '201':
+ *         description: Utilisateur créé avec succès
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/CreateUserResponse'
  *       '400':
- *         description: Données manquantes
- *         content:
- *           application/json:
- *             example:
- *               msg: "Veuillez fournir le nom d'utilisateur, le mot de passe et le role."
+ *         description: Données manquantes ou invalides
+ *       '404':
+ *         description: Rôle non trouvé
  *       '500':
  *         description: Erreur serveur
- *         content:
- *           application/json:
- *             example:
- *               message: "L'utilisateur n'a pas pu être créé. Réessayez."
- *               data: {} 
  */
 router.post('/', auth([], []), async (req, res) => {
-    // 
-    console.log();
-    if (
-        !req.body.role_name ||
-        !req.body.email ||
-        !req.body.password ||
-        !req.body.nom
-    ) {
-        res.status(400).send({
-            msg: "Please pass username, password and name.",
+    try {
+        const {
+            role_name,
+            email,
+            password,
+            nom,
+            prenom,
+            phone,
+            profilePic,
+            categorie,
+            biographie
+        } = req.body;
+
+        // Validation des champs obligatoires
+        if (!role_name || !email || !password || !nom) {
+            return res.status(400).json({
+                message: "Veuillez fournir le rôle, l'email, le mot de passe et le nom.",
+                details: {
+                    required: ['role_name', 'email', 'password', 'nom'],
+                    optional: ['prenom', 'phone', 'profilePic', 'categorie', 'biographie']
+                }
+            });
+        }
+
+        // Validation de l'email
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({
+                message: "Format d'email invalide.",
+                field: 'email'
+            });
+        }
+
+        // Validation du mot de passe
+        if (password.length < 6) {
+            return res.status(400).json({
+                message: "Le mot de passe doit contenir au moins 6 caractères.",
+                field: 'password'
+            });
+        }
+
+        // Recherche du rôle
+        const role = await sequelize.Role.findOne({
+            where: { role_name }
         });
-    } else {
-        sequelize.Role.findOne({
-            where: {
-                role_name: req.body.role_name,
-            },
-        }).then(async (role: any) => {
-            console.log(role.id);
-            // Generate OTP
-            let otp = randomstring.generate({
-                length: 6,
-                charset: 'numeric'
+
+        if (!role) {
+            return res.status(404).json({
+                message: `Le rôle '${role_name}' n'existe pas.`,
+                available_roles: ['Admin', 'Influenceur', 'Marque'] // À adapter selon vos rôles
             });
-            const hashedPassword = bcrypt.hashSync(req.body.password, bcrypt.genSaltSync(10));
-            sequelize.Utilisateur.create({
-                ...req.body,
-                password: hashedPassword,
-                otp: otp,
-                roleId: role.id,
-            }).then((utilisateur) => {
-                const message = `L'utilisateur a été bien cree avec succès`;
-                res.json({ message, data: utilisateur });
-            }).catch((error) => {
-                const message = `L'utilisateur n'a pas pu être cree. Réessayez.`;
-                res.status(500).json({ message, data: error });
+        }
+
+        // Vérification si l'email existe déjà
+        const existingUser = await sequelize.Utilisateur.findOne({
+            where: { email }
+        });
+
+        if (existingUser) {
+            return res.status(409).json({
+                message: "Un utilisateur avec cet email existe déjà.",
+                field: 'email'
             });
-        }).catch((error) => {
-            const message = `Le role n'existe pas. Réessayez dans quelques instants.`;
-            res.status(500).json({ message, data: error });
+        }
+
+        // Génération OTP
+        const otp = randomstring.generate({
+            length: 6,
+            charset: 'numeric'
+        });
+
+        // Hash du mot de passe
+        const hashedPassword = bcrypt.hashSync(password, bcrypt.genSaltSync(10));
+
+        // Création de l'utilisateur
+        const utilisateur = await sequelize.Utilisateur.create({
+            roleId: role.id,
+            email,
+            password: hashedPassword,
+            nom,
+            prenom: prenom || null,
+            phone: phone || null,
+            profilePic: profilePic || null,
+            status: 'actif',
+            categorie: categorie || null,
+            biographie: biographie || null,
+        });
+
+        // Réponse réussie
+        const responseData = {
+            id: utilisateur.id,
+            roleId: utilisateur.roleId,
+            email: utilisateur.email,
+            nom: utilisateur.nom,
+            prenom: utilisateur.prenom,
+            phone: utilisateur.phone,
+            profilePic: utilisateur.profilePic,
+            status: utilisateur.status,
+            categorie: utilisateur.categorie,
+            biographie: utilisateur.biographie,
+            createdAt: utilisateur.createdAt,
+            updatedAt: utilisateur.updatedAt
+        };
+
+        return res.status(201).json({
+            message: "L'utilisateur a été créé avec succès.",
+            data: responseData
+        });
+
+    } catch (error) {
+        console.error('Erreur lors de la création utilisateur:', error);
+
+        return res.status(500).json({
+            message: "Une erreur interne est survenue lors de la création de l'utilisateur.",
+            error: process.env.NODE_ENV === 'development' ? error : undefined
         });
     }
 });
+
+// Schéma Swagger pour la documentation
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     CreateUserInput:
+ *       type: object
+ *       required:
+ *         - role_name
+ *         - email
+ *         - password
+ *         - nom
+ *       properties:
+ *         role_name:
+ *           type: string
+ *           example: "Influenceur"
+ *         email:
+ *           type: string
+ *           format: email
+ *           example: "utilisateur@example.com"
+ *         password:
+ *           type: string
+ *           format: password
+ *           example: "motdepasse123"
+ *         nom:
+ *           type: string
+ *           example: "Doe"
+ *         prenom:
+ *           type: string
+ *           example: "John"
+ *         phone:
+ *           type: string
+ *           example: "+22890123456"
+ *         profilePic:
+ *           type: string
+ *           format: uri
+ *           example: "http://example.com/profile.jpg"
+ *         categorie:
+ *           type: string
+ *           example: "Mode"
+ *         biographie:
+ *           type: string
+ *           example: "Influenceur spécialisé dans la mode..."
+ * 
+ *     CreateUserResponse:
+ *       type: object
+ *       properties:
+ *         message:
+ *           type: string
+ *           example: "L'utilisateur a été créé avec succès."
+ *         data:
+ *           $ref: '#/components/schemas/User'
+ * 
+ *     User:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *           format: uuid
+ *         roleId:
+ *           type: string
+ *           format: uuid
+ *         email:
+ *           type: string
+ *         nom:
+ *           type: string
+ *         prenom:
+ *           type: string
+ *         phone:
+ *           type: string
+ *         profilePic:
+ *           type: string
+ *         status:
+ *           type: string
+ *           enum: [actif, inactif]
+ *         categorie:
+ *           type: string
+ *         biographie:
+ *           type: string
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ */
 
 /**
  * @swagger
@@ -138,7 +374,7 @@ router.post('/', auth([], []), async (req, res) => {
  *               message: "La liste des utilisateurs n'a pas pu être récupérée. Réessayez dans quelques instants."
  *               data: {}
  */
-router.get('/', auth([], []), async (req, res) => {
+router.get('/', async (req, res) => {
 
     await sequelize.Utilisateur.findAll({
         include: [
@@ -913,6 +1149,18 @@ router.get('/user/connect/me', auth([], []), async (req: AuthenticatedRequest, r
                     model: sequelize.Role,
                     as: 'role',
                     include: [{ model: sequelize.Permission, as: 'permissions' }],
+                },
+                {
+                    model: sequelize.SocialMediaAccount,
+                    as: "socialMediaAccounts",
+                },
+                {
+                    model: sequelize.WhatsAppNumber,
+                    as: "whatsappNumbers",
+                },
+                {
+                    model: sequelize.Profile,
+                    as: "profile",
                 },
             ],
         });

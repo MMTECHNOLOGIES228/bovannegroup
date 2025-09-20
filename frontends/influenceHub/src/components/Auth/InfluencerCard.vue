@@ -1,41 +1,50 @@
 <template>
   <div class="influencer-card">
     <div class="card-image">
-      <img :src="influencer.profileImage || '/default-avatar.png'" :alt="influencer.name">
+      <img :src="influencer.profilePic || '/default-avatar.png'" :alt="influencerName">
     </div>
     
     <div class="card-content">
-      <h3>{{ influencer.name }}</h3>
-      <p class="category">{{ influencer.category }}</p>
+      <h3>{{ influencerName }}</h3>
+      <p class="category">{{ influencer.categorie || 'Non spécifié' }}</p>
       
       <div class="stats">
         <div class="stat">
-          <span class="stat-value">{{ formatNumber(influencer.followers) }}</span>
+          <span class="stat-value">{{ totalFollowers }}</span>
           <span class="stat-label">Abonnés</span>
         </div>
         <div class="stat">
-          <span class="stat-value">{{ influencer.engagementRate }}%</span>
-          <span class="stat-label">Taux d'engagement</span>
+          <span class="stat-value">{{ platformCount }}</span>
+          <span class="stat-label">Plateformes</span>
         </div>
       </div>
       
-      <p class="bio">{{ truncateText(influencer.bio, 100) }}</p>
+      <p class="bio">{{ truncateText(influencer.biographie, 100) }}</p>
+      
+      <div class="social-platforms" v-if="hasSocialAccounts">
+        <span class="platform-tag" v-for="account in limitedAccounts" :key="account.id">
+          {{ account.platform }}
+        </span>
+        <span v-if="influencer.socialMediaAccounts.length > 3" class="platform-more">
+          +{{ influencer.socialMediaAccounts.length - 3 }} autres
+        </span>
+      </div>
       
       <div class="card-actions">
         <router-link 
-          :to="'/profile/' + influencer._id" 
+          :to="'/profile/' + influencer.id" 
           class="btn"
         >
           Voir le profil
         </router-link>
         
-        <router-link 
+        <!-- <router-link 
           v-if="isAdmin"
-          :to="'/admin/influencer/' + influencer._id" 
+          :to="'/admin/influencer/' + influencer.id + '/edit'" 
           class="btn"
         >
           Modifier
-        </router-link>
+        </router-link> -->
       </div>
     </div>
   </div>
@@ -43,7 +52,6 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useAuthStore } from '../../stores/auth'
 
 const props = defineProps({
   influencer: {
@@ -52,8 +60,30 @@ const props = defineProps({
   }
 })
 
-const authStore = useAuthStore()
-const isAdmin = computed(() => authStore.isAuthenticated)
+// Computed properties pour adapter aux données de l'API
+const influencerName = computed(() => {
+  return props.influencer.nom && props.influencer.prenom 
+    ? `${props.influencer.prenom} ${props.influencer.nom}`
+    : props.influencer.nom || props.influencer.prenom || 'Influenceur'
+})
+
+const totalFollowers = computed(() => {
+  if (!props.influencer.socialMediaAccounts) return '0'
+  const total = props.influencer.socialMediaAccounts.reduce((sum: number, account: any) => sum + (account.followers || 0), 0)
+  return formatNumber(total)
+})
+
+const platformCount = computed(() => {
+  return props.influencer.socialMediaAccounts?.length || 0
+})
+
+const hasSocialAccounts = computed(() => {
+  return props.influencer.socialMediaAccounts?.length > 0
+})
+
+const limitedAccounts = computed(() => {
+  return props.influencer.socialMediaAccounts?.slice(0, 3) || []
+})
 
 const formatNumber = (num: number) => {
   if (num >= 1000000) {
@@ -65,6 +95,7 @@ const formatNumber = (num: number) => {
 }
 
 const truncateText = (text: string, maxLength: number) => {
+  if (!text) return 'Aucune description'
   if (text.length <= maxLength) return text
   return text.substring(0, maxLength) + '...'
 }
@@ -77,6 +108,9 @@ const truncateText = (text: string, maxLength: number) => {
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   overflow: hidden;
   transition: transform 0.3s ease;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .influencer-card:hover {
@@ -97,17 +131,22 @@ const truncateText = (text: string, maxLength: number) => {
 
 .card-content {
   padding: 1.5rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .card-content h3 {
   margin: 0 0 0.5rem 0;
   color: #2c3e50;
+  font-size: 1.2rem;
 }
 
 .category {
   color: #7f8c8d;
   margin: 0 0 1rem 0;
   font-style: italic;
+  font-size: 0.9rem;
 }
 
 .stats {
@@ -121,6 +160,7 @@ const truncateText = (text: string, maxLength: number) => {
 
 .stat {
   text-align: center;
+  flex: 1;
 }
 
 .stat-value {
@@ -133,18 +173,44 @@ const truncateText = (text: string, maxLength: number) => {
 .stat-label {
   font-size: 0.8rem;
   color: #7f8c8d;
+  display: block;
 }
 
 .bio {
   color: #34495e;
-  line-height: 1.5;
+  line-height: 1.4;
   margin: 1rem 0;
+  flex: 1;
+  font-size: 0.9rem;
+}
+
+.social-platforms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.5rem 0 1rem 0;
+  align-items: center;
+}
+
+.platform-tag {
+  background: #e3f2fd;
+  color: #1976d2;
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.platform-more {
+  color: #7f8c8d;
+  font-size: 0.8rem;
+  font-style: italic;
 }
 
 .card-actions {
   display: flex;
   gap: 0.5rem;
-  margin-top: 1rem;
+  margin-top: auto;
 }
 
 .card-actions .btn {
@@ -152,5 +218,30 @@ const truncateText = (text: string, maxLength: number) => {
   text-align: center;
   padding: 0.5rem;
   font-size: 0.9rem;
+  text-decoration: none;
+  background-color: #667eea;
+  color: white;
+  border-radius: 4px;
+  transition: background-color 0.3s ease;
+}
+
+.card-actions .btn:hover {
+  background-color: #5a67d8;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .card-content {
+    padding: 1rem;
+  }
+  
+  .stats {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .card-actions {
+    flex-direction: column;
+  }
 }
 </style>

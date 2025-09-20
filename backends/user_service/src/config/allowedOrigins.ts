@@ -5,7 +5,7 @@ let allowedOrigins = [
     'http://localhost:9000',
     'http://localhost:3000',
     'http://195.26.241.68:9000',
-    'http://midzo-users:9000'
+    'http://localhost:5173'
 ];
 
 export default allowedOrigins;

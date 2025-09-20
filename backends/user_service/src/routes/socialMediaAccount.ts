@@ -68,7 +68,7 @@ const router: Router = express.Router();
  *         description: Erreur interne du serveur
  */
 
-router.post('/:utilisateurId', auth([], ["Admin"]), async (req: Request, res: Response) => {
+router.post('/:utilisateurId', auth([], []), async (req: Request, res: Response) => {
     try {
         const { utilisateurId } = req.params;
 
@@ -162,7 +162,7 @@ router.post('/:utilisateurId', auth([], ["Admin"]), async (req: Request, res: Re
  *         description: Erreur interne du serveur
  */
 
-router.post('/', auth([], ["Admin"]), async (req: AuthenticatedRequest, res: Response) => {
+router.post('/', auth([], []), async (req: AuthenticatedRequest, res: Response) => {
     try {
 
 
@@ -228,7 +228,7 @@ router.post('/', auth([], ["Admin"]), async (req: AuthenticatedRequest, res: Res
  *                   items:
  *                     type: object
  */
-router.get('/', auth([], ["Admin"]), async (req: Request, res: Response) => {
+router.get('/', auth([], []), async (req: Request, res: Response) => {
     try {
         const accounts = await sequelize.SocialMediaAccount.findAll();
         res.status(200).json({ message: 'Social media accounts retrieved successfully', data: accounts });
@@ -272,7 +272,7 @@ router.get('/', auth([], ["Admin"]), async (req: Request, res: Response) => {
  *                   type: string
  *                   example: Utilisateur non authentifié.
  */
-router.get('/me/', auth([], ["Admin"]), async (req: AuthenticatedRequest, res: Response) => {
+router.get('/me/', auth([], []), async (req: AuthenticatedRequest, res: Response) => {
     try {
         const utilisateurId = req.user?.id;
 
@@ -289,16 +289,16 @@ router.get('/me/', auth([], ["Admin"]), async (req: AuthenticatedRequest, res: R
         // Récupérer les comptes de médias sociaux pour cet utilisateur
         const socialMediaAccounts = await sequelize.SocialMediaAccount.findAll({
             where: { utilisateurId },
-            include: [
-                {
-                    model: sequelize.Permission,
-                    as: 'permissions',
-                },
-                {
-                    model: sequelize.Utilisateur,
-                    as: 'utilisateurs',
-                },
-            ],
+            // include: [
+            //     {
+            //         model: sequelize.Permission,
+            //         as: 'permissions',
+            //     },
+            //     {
+            //         model: sequelize.Utilisateur,
+            //         as: 'utilisateurs',
+            //     },
+            // ],
         });
 
         res.status(200).json({
@@ -310,6 +310,148 @@ router.get('/me/', auth([], ["Admin"]), async (req: AuthenticatedRequest, res: R
     }
 });
 //   
+
+/**
+ * @swagger
+ * /api/v1/social-media-accounts/add/me:
+ *   post:
+ *     summary: Créer ou mettre à jour les comptes de médias sociaux de l'utilisateur connecté
+ *     tags: [SocialMediaAccounts]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               accounts:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     platform:
+ *                       type: string
+ *                       example: "Instagram"
+ *                     accountUrl:
+ *                       type: string
+ *                       example: "https://instagram.com/utilisateur"
+ *                     followers:
+ *                       type: integer
+ *                       example: 10000
+ *             required:
+ *               - accounts
+ *     responses:
+ *       201:
+ *         description: Comptes de médias sociaux créés avec succès
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Comptes de médias sociaux créés avec succès.
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/SocialMediaAccount'
+ *       400:
+ *         description: Données invalides
+ *       401:
+ *         description: Utilisateur non authentifié
+ *       500:
+ *         description: Erreur serveur
+ */
+router.post('/add/me/', auth([], []), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+       const utilisateurId = req.user?.id;
+
+       console.log(req.user?.id)
+
+        if (!utilisateurId) {
+            return res.status(401).json({ message: 'Utilisateur non authentifié.' });
+        }
+
+
+        // Vérifiez si l'utilisateur existe
+        const utilisateur = await sequelize.Utilisateur.findByPk(utilisateurId);
+        if (!utilisateur) {
+            return res.status(404).json({ message: 'Utilisateur introuvable.' });
+        }
+
+        const { accounts } = req.body;
+
+        // Validation des données
+        if (!accounts || !Array.isArray(accounts)) {
+            return res.status(400).json({ message: 'Le champ "accounts" est requis et doit être un tableau.' });
+        }
+
+        // Préparer les données pour la création
+        const accountsToCreate = accounts.map(account => ({
+            platform: account.platform,
+            accountUrl: account.accountUrl,
+            followers: account.followers,
+            utilisateurId: utilisateurId
+        }));
+        console.log('Données des comptes à créer:', accountsToCreate);
+
+        // Créer les comptes de médias sociaux
+        const createdAccounts = await sequelize.SocialMediaAccount.bulkCreate(accountsToCreate, {
+            updateOnDuplicate: ['accountUrl', 'followers', 'updatedAt'] // Mise à jour si le compte existe déjà
+        });
+
+        res.status(201).json({
+            message: 'Comptes de médias sociaux créés avec succès.',
+            data: createdAccounts
+        });
+
+    } catch (error) {
+        console.error('Erreur lors de la création des comptes de médias sociaux:', error);
+        res.status(500).json({ 
+            message: 'Erreur lors de la création des comptes de médias sociaux.', 
+            error: process.env.NODE_ENV === 'development' ? error : undefined
+        });
+    }
+});
+
+// 
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     SocialMediaAccount:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *           format: uuid
+ *         platform:
+ *           type: string
+ *           example: "Instagram"
+ *         accountUrl:
+ *           type: string
+ *           format: uri
+ *           example: "https://instagram.com/utilisateur"
+ *         followers:
+ *           type: integer
+ *           example: 10000
+ *         utilisateurId:
+ *           type: string
+ *           format: uuid
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *       required:
+ *         - platform
+ *         - accountUrl
+ *         - utilisateurId
+ */
+
 
 /**
  * @swagger
@@ -334,7 +476,7 @@ router.get('/me/', auth([], ["Admin"]), async (req: AuthenticatedRequest, res: R
  *             schema:
  *               type: object
  */
-router.get('/:id', auth([], ["Admin"]), async (req: Request, res: Response) => {
+router.get('/:id', auth([], []), async (req: Request, res: Response) => {
     try {
         const account = await sequelize.SocialMediaAccount.findByPk(req.params.id);
         if (!account) {
@@ -376,7 +518,7 @@ router.get('/:id', auth([], ["Admin"]), async (req: Request, res: Response) => {
  *             schema:
  *               type: object
  */
-router.put('/:id', auth([], ["Admin"]), async (req: Request, res: Response) => {
+router.put('/:id', auth([], []), async (req: Request, res: Response) => {
     try {
         if (!req.body || Object.keys(req.body).length === 0) {
             return res.status(400).json({ message: 'The request body cannot be empty.' });

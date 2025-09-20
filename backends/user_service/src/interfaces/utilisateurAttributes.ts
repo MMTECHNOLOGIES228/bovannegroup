@@ -1,13 +1,13 @@
 export interface UtilisateurAttributes {
-  id: string;
-  roleId: string;
-  email: string;
-  password: string;
-  nom: string;
-  prenom: string;
-  phone: string;
-  profilePic: string | null;
+  id: String;
+  roleId: String;
+  email: String;
+  password: String;
+  nom: String;
+  prenom: String;
+  phone: String;
+  profilePic: String | null;
   status: 'actif' | 'inactif';
-  otp: string;
-  cashbackPoints: number;
+  categorie: String;
+  biographie: String;
   }
