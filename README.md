@@ -45,9 +45,9 @@ docker-compose up -d
 ```
 
 5. Accédez aux applications :
-   - Frontend: http://localhost:3000
-   - Backend API: http://localhost:5000
-   - Documentation API: http://localhost:5000/api-docs
+   - Frontend: http://localhost:5173
+   - Backend API: http://localhost:9000
+   - Documentation API: http://localhost:9000/api-docs
 
 ### Méthode 2: Installation Manuelle
 
