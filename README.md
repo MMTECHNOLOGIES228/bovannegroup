@@ -191,6 +191,14 @@ Ce projet est sous licence propriétaire. Tous droits réservés.
 ##  Support
 
 Pour toute question ou problème, veuillez contacter l'équipe de développement à +22891514288.
+<img width="2560" height="1440" alt="Screenshot 2025-09-20 at 10 26 39" src="https://github.com/user-attachments/assets/0ff294c4-29bc-4af8-80e5-f1cad9e44245" />
+
+
+
+
+
+
+<img width="2560" height="1440" alt="Screenshot 2025-09-20 at 10 27 35" src="https://github.com/user-attachments/assets/3416427e-5101-4377-bfe1-222d1a834f0e" />
 
 
 *Dernière mise à jour: 20 Septembre 2025*
