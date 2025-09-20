@@ -49,7 +49,7 @@ export const useInfluencerStore = defineStore('influencers', () => {
         error.value = null
         try {
             console.log('Fetching all influencers')
-            
+
             // Appel API sans filtres - on récupère tous les influenceurs
             const response = await userService.getAll({ role: 'Influenceur' })
 
@@ -242,22 +242,20 @@ export const useInfluencerStore = defineStore('influencers', () => {
         }
     }
 
-    // Uploader l'image de profil
+    // Uploader l'image de profil - CORRECTED
     const uploadProfileImage = async (formData: FormData) => {
         loading.value = true
         error.value = null
         try {
-            // Récupérer l'ID utilisateur depuis le FormData
-            const userId = formData.get('userId') as string
-            
             // Appel API pour uploader l'image
-            const response = await userService.uploadProfileImage(userId, formData)
-            
+            const response = await userService.uploadProfileImage(formData)
+
             // Mettre à jour l'image de profil dans le store si nécessaire
-            if (currentInfluencer.value && currentInfluencer.value.id === userId) {
-                currentInfluencer.value.profilePic = response.data.profilePic
+            // Note: la réponse est response.data.data (data contient les données utilisateur)
+            if (currentInfluencer.value && currentInfluencer.value.id === authStore.user?.id) {
+                currentInfluencer.value.profilePic = response.data.data.profilePic!
             }
-            
+
             return response.data
         } catch (err: any) {
             error.value = err.response?.data?.message || 'Erreur lors de l\'upload de l\'image'
@@ -266,7 +264,6 @@ export const useInfluencerStore = defineStore('influencers', () => {
             loading.value = false
         }
     }
-
     return {
         influencers,
         currentInfluencer,

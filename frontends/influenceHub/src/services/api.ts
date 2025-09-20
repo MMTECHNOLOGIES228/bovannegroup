@@ -80,9 +80,20 @@ export const userService = {
   // Supprimer un utilisateur
   delete: (id: string) => {
     return api.delete(`/utilisateur/${id}`)
+  },
+
+  // Uploader une image de profil - CORRECTED FIELD NAME
+  uploadProfileImage: (formData: FormData): Promise<AxiosResponse<{
+    message: string;
+    data: User;
+  }>> => {
+    return api.put('/utilisateur/user/image/upload-profile', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
   }
 
-  
 }
 
 // Services pour les réseaux sociaux

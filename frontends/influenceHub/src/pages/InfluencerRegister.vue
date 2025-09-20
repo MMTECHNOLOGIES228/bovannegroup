@@ -87,10 +87,12 @@ const handleProfileSubmit = async (profileData: any) => {
   try {
     console.log('Enregistrement de la photo de profil...', profileData)
     
-    // Créer un FormData pour l'upload du fichier
+    // Créer un FormData pour l'upload du fichier - CORRECT FIELD NAME
     const formData = new FormData()
-    formData.append('userId', profileData.userId)
-    formData.append('profileImage', profileData.profileImage)
+    formData.append('profilePic', profileData.profileImage) // Changé de 'profileImage' à 'profilePic'
+    
+    // Le userId n'est pas nécessaire dans le FormData car il est dans le token JWT
+    // formData.append('userId', profileData.userId) ← À SUPPRIMER
     
     await influencerStore.uploadProfileImage(formData)
     
