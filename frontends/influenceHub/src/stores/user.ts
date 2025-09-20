@@ -75,7 +75,6 @@ export const useUserStore = defineStore("user", {
       this.error = null;
       try {
         const res = await userService.getAll(); 
-        // ← adapte l’URL selon ton API
         this.users = res.data.data;
       } catch (err: any) {
         this.error = err.message || "Erreur lors du chargement des utilisateurs";
@@ -104,5 +103,5 @@ export const useUserStore = defineStore("user", {
     },
   },
 
-  
+
 });

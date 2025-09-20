@@ -1,5 +1,5 @@
 <template>
-  <div class="register-page">
+  <div class="register-page-out">
     <div class="container">
       <div class="register-form">
         <h2>Devenir influenceur sur notre plateforme</h2>

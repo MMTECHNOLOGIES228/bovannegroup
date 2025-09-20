@@ -30,13 +30,7 @@ const routes = [
         children: [
             { path: "", name: "admin.dashboard", component: AdminDashboard },
             { path: "influencer/new", name: "admin.influencer.new", component: () => import("@/pages/AdminInfluencerEdit.vue") },
-            {
-                path: "influencer/:id/edit",
-                name: "admin.influencer.edit",
-                component: () => import("@/pages/AdminInfluencerEdit.vue"),
-                props: true,
-                meta: { requiredRoles: ["Admin", "Influenceur"] } // Seul l'Admin peut éditer
-            },
+            {path: 'influencers/create',name: 'admin.influencer.create',component: () => import('@/pages/AdminInfluencerCreate.vue')}
         ],
     },
 ];

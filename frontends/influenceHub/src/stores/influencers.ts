@@ -264,6 +264,24 @@ export const useInfluencerStore = defineStore('influencers', () => {
             loading.value = false
         }
     }
+
+    const updateSocialAccounts = async (accountsData: any, accounts: any) => {
+        loading.value = true
+        error.value = null
+        try {
+            const response = await socialMediaService.createAccounts({
+                accounts: accountsData
+            })
+            console.log('updateSocialAccounts API response:', response.data)
+            return response.data
+        } catch (err: any) {
+            error.value = err.response?.data?.message || 'Erreur lors de la mise à jour des comptes sociaux'
+            throw err
+        } finally {
+            loading.value = false
+        }
+    }
+
     return {
         influencers,
         currentInfluencer,
@@ -276,6 +294,7 @@ export const useInfluencerStore = defineStore('influencers', () => {
         deleteInfluencer,
         createSocialAccounts,
         fetchInfluencerByMe,
-        uploadProfileImage
+        uploadProfileImage,
+        updateSocialAccounts
     }
 })
