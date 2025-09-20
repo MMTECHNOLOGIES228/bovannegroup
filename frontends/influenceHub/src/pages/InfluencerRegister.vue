@@ -12,6 +12,7 @@
           :show-cancel="true"
           @submit-basic="handleBasicSubmit"
           @submit-social="handleSocialSubmit"
+          @submit-profile="handleProfileSubmit"
           @cancel="handleCancel"
         />
         
@@ -26,7 +27,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useInfluencerStore } from '@/stores/influencers'
-import InfluencerForm from '@/components/Auth/InfluencerForm.vue' // Chemin corrigé
+import InfluencerForm from '@/components/Auth/InfluencerForm.vue'
 import router from '@/router'
 
 const influencerStore = useInfluencerStore()
@@ -42,20 +43,18 @@ const handleBasicSubmit = async (basicData: any) => {
   success.value = false
   
   try {
-    // Redirection ou message de succès
-    console.log('Inscription complétée avec succès!', basicData)
+    console.log('Enregistrement des informations de base...', basicData)
     const result = await influencerStore.createInfluencer(basicData)
 
-    // Redirection ou message de succès
-    console.log('Inscription complétée avec succès!')
+    console.log('Informations de base enregistrées avec succès!')
     
-    // Passer l'ID utilisateur au formulaire pour l'étape des réseaux sociaux
+    // Passer l'ID utilisateur au formulaire pour les étapes suivantes
     if (influencerFormRef.value) {
       influencerFormRef.value.setUserId(result.data.id)
     }
     
   } catch (err: any) {
-    error.value = err.message || 'Erreur lors de l\'inscription'
+    error.value = err.message || 'Erreur lors de l\'enregistrement des informations de base'
   } finally {
     loading.value = false
   }
@@ -66,12 +65,13 @@ const handleSocialSubmit = async (socialData: any) => {
   error.value = ''
   
   try {
+    console.log('Enregistrement des réseaux sociaux...', socialData)
     await influencerStore.createSocialAccounts(socialData.accounts)
-    success.value = true
     
-    setTimeout(() => {
-      router.push('/profile')
-    }, 2000)
+    // Indiquer que les réseaux sociaux sont enregistrés pour passer à l'étape suivante
+    if (influencerFormRef.value) {
+      influencerFormRef.value.setSocialCompleted()
+    }
     
   } catch (err: any) {
     error.value = err.message || 'Erreur lors de l\'enregistrement des réseaux sociaux'
@@ -80,9 +80,36 @@ const handleSocialSubmit = async (socialData: any) => {
   }
 }
 
+const handleProfileSubmit = async (profileData: any) => {
+  loading.value = true
+  error.value = ''
+  
+  try {
+    console.log('Enregistrement de la photo de profil...', profileData)
+    
+    // Créer un FormData pour l'upload du fichier
+    const formData = new FormData()
+    formData.append('userId', profileData.userId)
+    formData.append('profileImage', profileData.profileImage)
+    
+    await influencerStore.uploadProfileImage(formData)
+    
+    success.value = true
+    
+    setTimeout(() => {
+      router.push('/profile')
+    }, 2000)
+    
+  } catch (err: any) {
+    error.value = err.message || 'Erreur lors de l\'enregistrement de la photo de profil'
+  } finally {
+    loading.value = false
+  }
+}
+
 const handleCancel = () => {
   console.log('Formulaire annulé')
-  // Réinitialiser ou rediriger
+  router.push('/')
 }
 </script>
 

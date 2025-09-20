@@ -1,10 +1,11 @@
+// src/stores/influencers.ts
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { userService, socialMediaService } from '../services/api'
 import { useAuthStore } from './auth';
 
 // Définir le type pour un influenceur basé sur la structure de données réelle
-interface Influencer {
+export interface Influencer {
     id: string;
     roleId: string;
     email: string;
@@ -30,6 +31,8 @@ interface Influencer {
     }[];
     whatsappNumbers: any[];
     profile: any;
+    createdAt: string;
+    updatedAt: string;
 }
 
 export const useInfluencerStore = defineStore('influencers', () => {
@@ -40,47 +43,43 @@ export const useInfluencerStore = defineStore('influencers', () => {
 
     const authStore = useAuthStore()
 
-    const filters = ref({
-        category: '',
-        followersMin: '',
-        followersMax: '',
-        engagementRateMin: ''
-    })
-
-    // Récupérer tous les influenceurs avec filtres optionnels
-    const fetchInfluencers = async (customFilters = {}) => {
+    // Récupérer tous les influenceurs (sans filtres côté serveur)
+    const fetchInfluencers = async () => {
         loading.value = true
         error.value = null
         try {
-            console.log('Fetching influencers with filters:', customFilters)
-            const appliedFilters = { ...filters.value, ...customFilters }
-            const response = await userService.getAll(appliedFilters)
+            console.log('Fetching all influencers')
+            
+            // Appel API sans filtres - on récupère tous les influenceurs
+            const response = await userService.getAll({ role: 'Influenceur' })
 
             console.log('Raw API response:', response.data)
 
             // Vérifiez la structure de la réponse
             if (response.data && response.data.data) {
-                // Utiliser directement les données de l'API sans transformation excessive
-                influencers.value = response.data.data.map((user: any) => ({
-                    id: user.id,
-                    roleId: user.roleId,
-                    email: user.email,
-                    nom: user.nom,
-                    prenom: user.prenom,
-                    phone: user.phone,
-                    profilePic: user.profilePic,
-                    status: user.status,
-                    categorie: user.categorie,
-                    biographie: user.biographie,
-                    createdAt: user.createdAt,
-                    updatedAt: user.updatedAt,
-                    role: user.role,
-                    socialMediaAccounts: user.socialMediaAccounts || [],
-                    whatsappNumbers: user.whatsappNumbers || [],
-                    profile: user.profile
-                }))
+                // Filtrer pour ne garder que les influenceurs (rôle "Influenceur")
+                influencers.value = response.data.data
+                    .filter((user: any) => user.role?.role_name === 'Influenceur')
+                    .map((user: any) => ({
+                        id: user.id,
+                        roleId: user.roleId,
+                        email: user.email,
+                        nom: user.nom,
+                        prenom: user.prenom,
+                        phone: user.phone,
+                        profilePic: user.profilePic,
+                        status: user.status,
+                        categorie: user.categorie,
+                        biographie: user.biographie,
+                        createdAt: user.createdAt,
+                        updatedAt: user.updatedAt,
+                        role: user.role,
+                        socialMediaAccounts: user.socialMediaAccounts || [],
+                        whatsappNumbers: user.whatsappNumbers || [],
+                        profile: user.profile
+                    }))
 
-                console.log('Transformed influencers:', influencers.value)
+                console.log('Filtered influencers:', influencers.value)
             } else {
                 throw new Error('Structure de réponse API invalide')
             }
@@ -117,7 +116,9 @@ export const useInfluencerStore = defineStore('influencers', () => {
                 role: user.role,
                 socialMediaAccounts: user.socialMediaAccounts || [],
                 whatsappNumbers: user.whatsappNumbers || [],
-                profile: user.profile
+                profile: user.profile,
+                createdAt: user.createdAt,
+                updatedAt: user.updatedAt
             }
         } catch (err: any) {
             error.value = err.response?.data?.message || 'Erreur lors du chargement'
@@ -145,12 +146,13 @@ export const useInfluencerStore = defineStore('influencers', () => {
                 profilePic: user.profilePic || '',
                 status: user.status,
                 categorie: user.categorie || '',
-                biographie: user.biographie || ''
-,                role: user.role,
+                biographie: user.biographie || '',
+                role: user.role,
                 socialMediaAccounts: user.socialMediaAccounts || [],
                 whatsappNumbers: user.whatsappNumbers || [],
-                profile: user.profile
-
+                profile: user.profile,
+                createdAt: user.createdAt,
+                updatedAt: user.updatedAt
             }
 
             return currentInfluencer.value
@@ -240,9 +242,29 @@ export const useInfluencerStore = defineStore('influencers', () => {
         }
     }
 
-    // Mettre à jour les filtres
-    const updateFilters = (newFilters: any) => {
-        filters.value = { ...filters.value, ...newFilters }
+    // Uploader l'image de profil
+    const uploadProfileImage = async (formData: FormData) => {
+        loading.value = true
+        error.value = null
+        try {
+            // Récupérer l'ID utilisateur depuis le FormData
+            const userId = formData.get('userId') as string
+            
+            // Appel API pour uploader l'image
+            const response = await userService.uploadProfileImage(userId, formData)
+            
+            // Mettre à jour l'image de profil dans le store si nécessaire
+            if (currentInfluencer.value && currentInfluencer.value.id === userId) {
+                currentInfluencer.value.profilePic = response.data.profilePic
+            }
+            
+            return response.data
+        } catch (err: any) {
+            error.value = err.response?.data?.message || 'Erreur lors de l\'upload de l\'image'
+            throw err
+        } finally {
+            loading.value = false
+        }
     }
 
     return {
@@ -250,14 +272,13 @@ export const useInfluencerStore = defineStore('influencers', () => {
         currentInfluencer,
         loading,
         error,
-        filters,
         fetchInfluencers,
         fetchInfluencerById,
         createInfluencer,
         updateInfluencer,
         deleteInfluencer,
-        updateFilters,
         createSocialAccounts,
-        fetchInfluencerByMe
+        fetchInfluencerByMe,
+        uploadProfileImage
     }
 })

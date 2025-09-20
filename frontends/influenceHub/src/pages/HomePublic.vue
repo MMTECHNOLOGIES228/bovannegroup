@@ -32,7 +32,7 @@
             <input 
               type="number" 
               id="followers-min" 
-              v-model="filters.followersMin" 
+              v-model.number="filters.followersMin" 
               placeholder="0" 
               min="0"
             >
@@ -43,13 +43,14 @@
             <input 
               type="number" 
               id="followers-max" 
-              v-model="filters.followersMax" 
+              v-model.number="filters.followersMax" 
               placeholder="1000000" 
               min="0"
             >
           </div>
           
           <button @click="applyFilters" class="btn">Appliquer les filtres</button>
+          <button @click="resetFilters" class="btn btn-secondary">Réinitialiser</button>
         </div>
       </div>
     </section>
@@ -57,20 +58,29 @@
     <section class="influencers-section">
       <div class="container">
         <div v-if="influencerStore.loading" class="loading">
+          <div class="spinner"></div>
           Chargement des influenceurs...
         </div>
         
         <div v-else-if="influencerStore.error" class="error">
-          Erreur: {{ influencerStore.error }}
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
+            <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zM8 4a.905.905 0 0 0-.9.995l.35 3.507a.552.552 0 0 0 1.1 0l.35-3.507A.905.905 0 0 0 8 4zm.002 6a1 1 0 1 0 0 2 1 1 0 0 0 0-2z"/>
+          </svg>
+          <p>Erreur: {{ influencerStore.error }}</p>
+          <button @click="refreshInfluencers" class="btn btn-small">Réessayer</button>
         </div>
         
-        <div v-else-if="influencerStore.influencers.length === 0" class="no-results">
-          Aucun influenceur ne correspond à vos critères de recherche.
+        <div v-else-if="filteredInfluencers.length === 0" class="no-results">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
+            <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+            <path d="M7 11.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 0 1h-1a.5.5 0 0 1-.5-.5zm0-5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 0 1h-1a.5.5 0 0 1-.5-.5zm0 2.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 0 1h-1a.5.5 0 0 1-.5-.5z"/>
+          </svg>
+          <p>Aucun influenceur ne correspond à vos critères de recherche.</p>
         </div>
         
         <div v-else class="influencers-grid">
           <InfluencerCard 
-            v-for="influencer in influencerStore.influencers" 
+            v-for="influencer in filteredInfluencers" 
             :key="influencer.id" 
             :influencer="influencer"
           />
@@ -81,25 +91,76 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useInfluencerStore } from '@/stores/influencers'
-import InfluencerCard from '@/components/Auth/InfluencerCard.vue' // Chemin corrigé
+import InfluencerCard from '@/components/Auth/InfluencerCard.vue'
 
 const influencerStore = useInfluencerStore()
 
 const filters = ref({
   category: '',
-  followersMin: '',
-  followersMax: ''
+  followersMin: null as number | null,
+  followersMax: null as number | null
 })
 
+// Charger les influenceurs au montage du composant
 onMounted(() => {
   influencerStore.fetchInfluencers()
 })
 
+// Appliquer les filtres
 const applyFilters = () => {
-  influencerStore.fetchInfluencers(filters.value)
+  // Les filtres sont appliqués via la propriété computed filteredInfluencers
+  // Cette fonction peut être utilisée pour des actions supplémentaires si nécessaire
 }
+
+// Réinitialiser les filtres
+const resetFilters = () => {
+  filters.value = {
+    category: '',
+    followersMin: null,
+    followersMax: null
+  }
+}
+
+// Rafraîchir la liste des influenceurs
+const refreshInfluencers = () => {
+  influencerStore.fetchInfluencers()
+}
+
+// Calculer le nombre total d'abonnés pour un influenceur
+const calculateTotalFollowers = (influencer: any) => {
+  if (!influencer.socialMediaAccounts || influencer.socialMediaAccounts.length === 0) return 0
+  return influencer.socialMediaAccounts.reduce((total: number, account: any) => total + (account.followers || 0), 0)
+}
+
+// Filtrer les influenceurs en fonction des critères
+const filteredInfluencers = computed(() => {
+  return influencerStore.influencers.filter((influencer) => {
+    // Filtre par catégorie
+    if (filters.value.category && influencer.categorie !== filters.value.category) {
+      return false
+    }
+    
+    // Filtre par nombre d'abonnés minimum
+    if (filters.value.followersMin !== null) {
+      const totalFollowers = calculateTotalFollowers(influencer)
+      if (totalFollowers < filters.value.followersMin) {
+        return false
+      }
+    }
+    
+    // Filtre par nombre d'abonnés maximum
+    if (filters.value.followersMax !== null) {
+      const totalFollowers = calculateTotalFollowers(influencer)
+      if (totalFollowers > filters.value.followersMax) {
+        return false
+      }
+    }
+    
+    return true
+  })
+})
 </script>
 
 <style scoped>
@@ -190,6 +251,14 @@ const applyFilters = () => {
   background-color: #5a67d8;
 }
 
+.btn-secondary {
+  background-color: #95a5a6;
+}
+
+.btn-secondary:hover {
+  background-color: #7f8c8d;
+}
+
 .influencers-section {
   padding: 3rem 0;
 }
@@ -198,14 +267,36 @@ const applyFilters = () => {
   text-align: center;
   padding: 2rem;
   font-size: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.loading {
+  color: #3498db;
 }
 
 .error {
-  color: #dc3545;
+  color: #e74c3c;
 }
 
 .no-results {
-  color: #6c757d;
+  color: #7f8c8d;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #3498db;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 .influencers-grid {

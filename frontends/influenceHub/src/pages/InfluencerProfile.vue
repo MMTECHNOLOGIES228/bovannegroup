@@ -97,22 +97,47 @@ onMounted(async () => {
 
 // Computed properties adaptées
 const influencerName = computed(() => {
-  return influencer.value?.name || 'Influenceur'
+  if (!influencer.value) return 'Influenceur'
+  return `${influencer.value.prenom} ${influencer.value.nom}`
 })
 
 const totalFollowers = computed(() => {
-  return influencer.value?.followers || 0
+  if (!influencer.value || !influencer.value.socialMediaAccounts) return 0
+  return influencer.value.socialMediaAccounts.reduce((total, account) => {
+    return total + (account.followers || 0)
+  }, 0)
 })
 
 const hasSocialAccounts = computed(() => {
-  return influencer.value?.socialMediaAccounts?.length > 0
+  return influencer.value?.socialMediaAccounts?.length! > 0
 })
+
+// Méthodes utilitaires
+const formatNumber = (num: number) => {
+  if (num >= 1000000) {
+    return (num / 1000000).toFixed(1) + 'M'
+  } else if (num >= 1000) {
+    return (num / 1000).toFixed(1) + 'K'
+  }
+  return num.toString()
+}
+
+const formatUrl = (url: string) => {
+  try {
+    const urlObj = new URL(url)
+    return urlObj.hostname + urlObj.pathname
+  } catch (e) {
+    return url
+  }
+}
 </script>
 
 <style scoped>
 .influencer-profile {
   min-height: 70vh;
   padding: 2rem 0;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 .loading, .error, .not-found {
@@ -135,6 +160,10 @@ const hasSocialAccounts = computed(() => {
   margin-bottom: 2rem;
   align-items: center;
   flex-wrap: wrap;
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .profile-image {
@@ -271,6 +300,21 @@ const hasSocialAccounts = computed(() => {
 .back-link {
   text-align: center;
   margin-top: 2rem;
+}
+
+.btn {
+  display: inline-block;
+  padding: 0.75rem 1.5rem;
+  background-color: #007bff;
+  color: white;
+  text-decoration: none;
+  border-radius: 4px;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.btn:hover {
+  background-color: #0056b3;
 }
 
 @media (max-width: 768px) {

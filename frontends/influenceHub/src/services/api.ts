@@ -81,6 +81,8 @@ export const userService = {
   delete: (id: string) => {
     return api.delete(`/utilisateur/${id}`)
   }
+
+  
 }
 
 // Services pour les réseaux sociaux

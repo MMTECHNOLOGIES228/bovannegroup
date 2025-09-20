@@ -708,7 +708,7 @@ router.put('/upload/:id', auth([], []), async (req: any, res: any) => {
 
 /**
  * @swagger
- * /api/v1/utilisateur/upload-profile:
+ * /api/v1/utilisateur/user/image/upload-profile:
  *   put:
  *     summary: Mettre à jour la photo de profil de l'utilisateur connecté
  *     tags: [utilisateur]
@@ -751,7 +751,7 @@ router.put('/upload/:id', auth([], []), async (req: any, res: any) => {
  *             example:
  *               message: "Erreur lors de la mise à jour de la photo de profil."
  */
-router.put('/upload-profile', auth([], []), async (req: AuthenticatedRequest, res: Response) => {
+router.put('/user/image/upload-profile', auth([], []), async (req: AuthenticatedRequest, res: Response) => {
     try {
         // Vérifier si un fichier est envoyé
         if (!req.files || Object.keys(req.files).length === 0) {
@@ -759,10 +759,12 @@ router.put('/upload-profile', auth([], []), async (req: AuthenticatedRequest, re
         }
 
         const file: any = req.files.profilePic;
+        
         const utilisateurId = req.user?.id;
 
         // Vérifier si l'utilisateur connecté existe
         const utilisateur = await sequelize.Utilisateur.findByPk(utilisateurId);
+        
         if (!utilisateur) {
             return res.status(404).json({ message: 'Utilisateur introuvable.' });
         }
