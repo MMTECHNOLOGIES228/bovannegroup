@@ -13,7 +13,6 @@ import { Request, Response } from 'express';
 import axios, { AxiosResponse } from "axios";
 import https from "https";
 import qs from "qs";
-import { ClientId, ApiKey, SenderId, Message } from "../config/afriksms_key";
 import auth, { AuthenticatedRequest } from '../middlewares/auth';
 // 
 

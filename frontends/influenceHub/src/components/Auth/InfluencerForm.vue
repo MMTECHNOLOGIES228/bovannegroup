@@ -1,222 +1,301 @@
-<script lang="ts" setup>
-import { ref, reactive, watch, defineEmits, defineProps } from "vue";
-import api from "@/services/api";
-
-const props = defineProps<{
-  influencer?: any; // mode édition si défini
-}>();
-const emit = defineEmits(["submit-success", "cancel"]);
-
-const form = reactive({
-  name: "",
-  email: "",
-  bio: "",
-  platforms: [] as string[],
-  audienceSize: null as number | null,
-  country: "",
-  tags: [] as string[],
-  socials: {
-    instagram: "",
-    tiktok: "",
-    youtube: "",
-  },
-  photos: [] as string[],
-  avatarFile: null as File | null,
-});
-
-const errors = reactive<{ [k: string]: string }>({});
-const loading = ref(false);
-
-// Pré-remplissage en édition
-watch(
-  () => props.influencer,
-  (inf) => {
-    if (inf) {
-      form.name = inf.name || "";
-      form.email = inf.email || "";
-      form.bio = inf.bio || "";
-      form.platforms = inf.platforms || [];
-      form.audienceSize = inf.audienceSize || null;
-      form.country = inf.country || "";
-      form.tags = inf.tags || [];
-      form.socials = { ...form.socials, ...(inf.socials || {}) };
-      form.photos = inf.photos || [];
-    }
-  },
-  { immediate: true }
-);
-
-function validate() {
-  errors.name = form.name ? "" : "Nom requis";
-  errors.email = /\S+@\S+\.\S+/.test(form.email) ? "" : "Email invalide";
-  errors.audienceSize =
-    form.audienceSize && form.audienceSize > 0 ? "" : "Audience requise";
-  return !Object.values(errors).some((e) => e);
-}
-
-async function handleSubmit() {
-  if (!validate()) return;
-
-  loading.value = true;
-  try {
-    let res;
-    if (props.influencer?.id) {
-      // édition
-      res = await api.put(`/influencers/${props.influencer.id}`, {
-        ...form,
-        avatarFile: undefined, // upload séparé
-      });
-    } else {
-      // création
-      res = await api.post("/influencers", {
-        ...form,
-        avatarFile: undefined,
-      });
-    }
-
-    const id = props.influencer?.id || res.data.id;
-
-    // upload avatar si fichier choisi
-    if (form.avatarFile) {
-      const fd = new FormData();
-      fd.append("avatar", form.avatarFile);
-      await api.post(`/influencers/${id}/avatar`, fd, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-    }
-
-    emit("submit-success", res.data);
-  } catch (err) {
-    console.error(err);
-    alert("Erreur lors de l’enregistrement");
-  } finally {
-    loading.value = false;
-  }
-}
-
-function onAvatarChange(e: Event) {
-  const files = (e.target as HTMLInputElement).files;
-  if (files && files[0]) {
-    form.avatarFile = files[0];
-  }
-}
-</script>
-
 <template>
-  <form @submit.prevent="handleSubmit" class="space-y-4">
-    <!-- Nom -->
-    <div>
-      <label class="block font-medium">Nom *</label>
-      <input v-model="form.name" type="text" class="w-full p-2 border rounded" />
-      <p v-if="errors.name" class="text-red-500 text-sm">{{ errors.name }}</p>
+  <form @submit.prevent="handleSubmit" class="influencer-form">
+    <div class="form-row">
+      <div class="form-group">
+        <label for="name">Nom complet *</label>
+        <input
+          type="text"
+          id="name"
+          v-model="formData.name"
+          required
+          placeholder="Nom de l'influenceur"
+        >
+      </div>
+      
+      <div class="form-group">
+        <label for="category">Catégorie *</label>
+        <select id="category" v-model="formData.category" required>
+          <option value="">Sélectionnez une catégorie</option>
+          <option value="Mode">Mode</option>
+          <option value="Beauté">Beauté</option>
+          <option value="Lifestyle">Lifestyle</option>
+          <option value="Voyage">Voyage</option>
+          <option value="Gastronomie">Gastronomie</option>
+          <option value="Fitness">Fitness</option>
+          <option value="Technologie">Technologie</option>
+          <option value="Gaming">Gaming</option>
+          <option value="Autre">Autre</option>
+        </select>
+      </div>
     </div>
-
-    <!-- Email -->
-    <div>
-      <label class="block font-medium">Email *</label>
-      <input v-model="form.email" type="email" class="w-full p-2 border rounded" />
-      <p v-if="errors.email" class="text-red-500 text-sm">{{ errors.email }}</p>
+    
+    <div class="form-row">
+      <div class="form-group">
+        <label for="email">Email *</label>
+        <input
+          type="email"
+          id="email"
+          v-model="formData.email"
+          required
+          placeholder="Email de contact"
+        >
+      </div>
+      
+      <div class="form-group">
+        <label for="phone">Téléphone</label>
+        <input
+          type="tel"
+          id="phone"
+          v-model="formData.phone"
+          placeholder="Numéro de téléphone"
+        >
+      </div>
     </div>
-
-    <!-- Bio -->
-    <div>
-      <label class="block font-medium">Bio</label>
-      <textarea v-model="form.bio" rows="3" class="w-full p-2 border rounded"></textarea>
+    
+    <div class="form-group">
+      <label for="bio">Biographie *</label>
+      <textarea
+        id="bio"
+        v-model="formData.bio"
+        required
+        rows="4"
+        placeholder="Description de l'influenceur et de son contenu"
+      ></textarea>
     </div>
-
-    <!-- Plateformes -->
-    <div>
-      <label class="block font-medium">Plateformes</label>
-      <select v-model="form.platforms" multiple class="w-full p-2 border rounded">
-        <option value="instagram">Instagram</option>
-        <option value="tiktok">TikTok</option>
-        <option value="youtube">YouTube</option>
-      </select>
+    
+    <div class="form-row">
+      <div class="form-group">
+        <label for="followers">Nombre d'abonnés *</label>
+        <input
+          type="number"
+          id="followers"
+          v-model="formData.followers"
+          required
+          min="0"
+          placeholder="0"
+        >
+      </div>
+      
+      <div class="form-group">
+        <label for="engagementRate">Taux d'engagement (%) *</label>
+        <input
+          type="number"
+          id="engagementRate"
+          v-model="formData.engagementRate"
+          required
+          min="0"
+          max="100"
+          step="0.01"
+          placeholder="0.00"
+        >
+      </div>
     </div>
-
-    <!-- Audience -->
-    <div>
-      <label class="block font-medium">Audience (nombre de followers) *</label>
+    
+    <div class="form-group">
+      <label for="profileImage">URL de l'image de profil</label>
       <input
-        v-model.number="form.audienceSize"
-        type="number"
-        min="0"
-        class="w-full p-2 border rounded"
-      />
-      <p v-if="errors.audienceSize" class="text-red-500 text-sm">{{ errors.audienceSize }}</p>
-    </div>
-
-    <!-- Pays -->
-    <div>
-      <label class="block font-medium">Pays</label>
-      <input v-model="form.country" type="text" class="w-full p-2 border rounded" />
-    </div>
-
-    <!-- Tags -->
-    <div>
-      <label class="block font-medium">Tags (séparés par virgule)</label>
-      <input
-        v-model="form.tags"
-        @change="form.tags = (form.tags as any).split(',').map((t: string) => t.trim())"
-        :value="form.tags.join(', ')"
-        type="text"
-        class="w-full p-2 border rounded"
-      />
-    </div>
-
-    <!-- Social links -->
-    <div>
-      <label class="block font-medium">Réseaux sociaux</label>
-      <input
-        v-model="form.socials.instagram"
         type="url"
-        placeholder="Instagram URL"
-        class="w-full p-2 border rounded mb-2"
-      />
-      <input
-        v-model="form.socials.tiktok"
-        type="url"
-        placeholder="TikTok URL"
-        class="w-full p-2 border rounded mb-2"
-      />
-      <input
-        v-model="form.socials.youtube"
-        type="url"
-        placeholder="YouTube URL"
-        class="w-full p-2 border rounded"
-      />
+        id="profileImage"
+        v-model="formData.profileImage"
+        placeholder="https://example.com/image.jpg"
+      >
     </div>
-
-    <!-- Photos -->
-    <div>
-      <label class="block font-medium">Photos (URLs, séparées par virgule)</label>
-      <input
-        v-model="form.photos"
-        @change="form.photos = (form.photos as any).split(',').map((p: string) => p.trim())"
-        :value="form.photos.join(', ')"
-        type="text"
-        class="w-full p-2 border rounded"
-      />
+    
+    <div class="form-group">
+      <label>Réseaux sociaux</label>
+      <div class="social-inputs">
+        <div class="social-input">
+          <span class="social-icon">📷</span>
+          <input
+            type="url"
+            v-model="formData.socialMedia.instagram"
+            placeholder="Lien Instagram"
+          >
+        </div>
+        <div class="social-input">
+          <span class="social-icon">🐦</span>
+          <input
+            type="url"
+            v-model="formData.socialMedia.twitter"
+            placeholder="Lien Twitter"
+          >
+        </div>
+        <div class="social-input">
+          <span class="social-icon">📘</span>
+          <input
+            type="url"
+            v-model="formData.socialMedia.facebook"
+            placeholder="Lien Facebook"
+          >
+        </div>
+        <div class="social-input">
+          <span class="social-icon">📹</span>
+          <input
+            type="url"
+            v-model="formData.socialMedia.youtube"
+            placeholder="Lien YouTube"
+          >
+        </div>
+        <div class="social-input">
+          <span class="social-icon">📱</span>
+          <input
+            type="url"
+            v-model="formData.socialMedia.tiktok"
+            placeholder="Lien TikTok"
+          >
+        </div>
+      </div>
     </div>
-
-    <!-- Avatar -->
-    <div>
-      <label class="block font-medium">Avatar</label>
-      <input type="file" accept="image/*" @change="onAvatarChange" />
+    
+    <div v-if="error" class="error-message">
+      {{ error }}
     </div>
-
-    <!-- Actions -->
-    <div class="flex justify-end gap-3">
-      <button type="button" @click="emit('cancel')" class="px-4 py-2 bg-gray-300 rounded">
+    
+    <div class="form-actions">
+      <button 
+        type="button" 
+        class="btn btn-secondary" 
+        @click="$emit('cancel')"
+        v-if="showCancel"
+      >
         Annuler
       </button>
-      <button
-        type="submit"
+      <button 
+        type="submit" 
+        class="btn"
         :disabled="loading"
-        class="px-4 py-2 bg-blue-600 text-white rounded"
       >
-        {{ loading ? "Enregistrement..." : "Enregistrer" }}
+        {{ loading ? 'Enregistrement...' : submitText }}
       </button>
     </div>
   </form>
 </template>
+
+<script setup lang="ts">
+import { ref, watch, computed } from 'vue'
+
+const props = defineProps({
+  influencer: {
+    type: Object,
+    default: null
+  },
+  loading: {
+    type: Boolean,
+    default: false
+  },
+  error: {
+    type: String,
+    default: ''
+  },
+  showCancel: {
+    type: Boolean,
+    default: false
+  }
+})
+
+const emit = defineEmits(['submit', 'cancel'])
+
+const defaultFormData = {
+  name: '',
+  category: '',
+  email: '',
+  phone: '',
+  bio: '',
+  followers: 0,
+  engagementRate: 0,
+  profileImage: '',
+  socialMedia: {
+    instagram: '',
+    twitter: '',
+    facebook: '',
+    youtube: '',
+    tiktok: ''
+  }
+}
+
+const formData = ref({ ...defaultFormData })
+
+// Mettre à jour le formulaire quand l'influenceur change
+watch(() => props.influencer, (newInfluencer) => {
+  if (newInfluencer) {
+    formData.value = { ...defaultFormData, ...newInfluencer }
+    // S'assurer que socialMedia est bien un objet
+    if (newInfluencer.socialMedia) {
+      formData.value.socialMedia = { ...defaultFormData.socialMedia, ...newInfluencer.socialMedia }
+    }
+  } else {
+    formData.value = { ...defaultFormData }
+  }
+}, { immediate: true })
+
+const submitText = computed(() => {
+  return props.influencer ? 'Mettre à jour' : 'Créer l\'influenceur'
+})
+
+const handleSubmit = () => {
+  emit('submit', formData.value)
+}
+</script>
+
+<style scoped>
+.influencer-form {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.form-row {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.form-row .form-group {
+  flex: 1;
+}
+
+.social-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.social-input {
+  display: flex;
+  align-items: center;
+}
+
+.social-icon {
+  margin-right: 0.5rem;
+  font-size: 1.2rem;
+  width: 30px;
+  text-align: center;
+}
+
+.social-input input {
+  flex: 1;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.error-message {
+  color: #dc3545;
+  margin: 1rem 0;
+  padding: 0.5rem;
+  background-color: #f8d7da;
+  border: 1px solid #f5c6cb;
+  border-radius: 4px;
+}
+
+.btn-secondary {
+  background-color: #6c757d;
+}
+
+.btn-secondary:hover {
+  background-color: #5a6268;
+}
+</style>

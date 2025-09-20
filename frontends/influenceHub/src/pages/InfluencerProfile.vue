@@ -1,111 +1,285 @@
-<script lang="ts" setup>
-import { onMounted, ref, computed } from "vue";
-import { useRoute, useRouter } from "vue-router";
-import { useInfluencersStore } from "@/stores/influencers";
-import { useAuthStore } from "@/stores/auth";
-
-const route = useRoute();
-const router = useRouter();
-const store = useInfluencersStore();
-const auth = useAuthStore();
-
-const influencer = ref<any>(null);
-const loading = ref(true);
-
-onMounted(async () => {
-  loading.value = true;
-  influencer.value = await store.fetchOne(route.params.id as string);
-  loading.value = false;
-});
-
-const canEdit = computed(() => {
-  if (!auth.isAuthenticated) return false;
-  if (auth.isAdmin) return true;
-  return influencer.value && auth.user?.id === influencer.value.id;
-});
-
-function goToEdit() {
-  router.push({ name: "admin.influencer.edit", params: { id: influencer.value.id } });
-}
-</script>
-
 <template>
-  <div class="max-w-4xl mx-auto p-6">
-    <div v-if="loading">Chargement du profil...</div>
-
-    <div v-else-if="influencer" class="space-y-6">
-      <!-- Header -->
-      <div class="flex items-center gap-6">
-        <img
-          :src="influencer.avatar || '/default-avatar.png'"
-          alt="avatar"
-          class="w-32 h-32 rounded-full object-cover border"
-        />
-        <div>
-          <h1 class="text-2xl font-bold">{{ influencer.name }}</h1>
-          <p class="text-gray-600">{{ influencer.bio }}</p>
-          <p class="text-sm text-gray-500">Pays : {{ influencer.country }}</p>
+  <div class="influencer-profile">
+    <div v-if="loading" class="loading">
+      Chargement du profil...
+    </div>
+    
+    <div v-else-if="error" class="error">
+      Erreur: {{ error }}
+    </div>
+    
+    <div v-else-if="influencer" class="profile-content">
+      <div class="profile-header">
+        <div class="profile-image">
+          <img :src="influencer.profileImage || '/default-avatar.png'" :alt="influencer.name">
         </div>
-      </div>
-
-      <!-- Stats -->
-      <div class="grid grid-cols-3 gap-4 text-center">
-        <div class="p-4 bg-gray-100 rounded">
-          <p class="text-lg font-bold">{{ influencer.stats?.followers ?? 0 }}</p>
-          <p class="text-sm text-gray-600">Followers</p>
-        </div>
-        <div class="p-4 bg-gray-100 rounded">
-          <p class="text-lg font-bold">{{ influencer.stats?.posts ?? 0 }}</p>
-          <p class="text-sm text-gray-600">Posts</p>
-        </div>
-        <div class="p-4 bg-gray-100 rounded">
-          <p class="text-lg font-bold">{{ influencer.stats?.engagementRate ?? 0 }}%</p>
-          <p class="text-sm text-gray-600">Engagement</p>
-        </div>
-      </div>
-
-      <!-- Réseaux sociaux -->
-      <div>
-        <h2 class="text-xl font-semibold mb-2">Réseaux sociaux</h2>
-        <ul class="space-y-1">
-          <li v-for="(link, key) in influencer.socials" :key="key">
-            <a :href="link" target="_blank" class="text-blue-600 hover:underline">
-              {{ key }} : {{ link }}
-            </a>
-          </li>
-        </ul>
-      </div>
-
-      <!-- Portfolio -->
-      <div>
-        <h2 class="text-xl font-semibold mb-2">Portfolio</h2>
-        <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
-          <div
-            v-for="(item, i) in influencer.portfolio || []"
-            :key="i"
-            class="border rounded overflow-hidden"
-          >
-            <img v-if="item.type === 'image'" :src="item.url" class="w-full h-40 object-cover" />
-            <video v-else controls class="w-full h-40 object-cover">
-              <source :src="item.url" type="video/mp4" />
-            </video>
+        
+        <div class="profile-info">
+          <h1>{{ influencer.name }}</h1>
+          <p class="category">{{ influencer.category }}</p>
+          
+          <div class="stats">
+            <div class="stat">
+              <span class="stat-value">{{ formatNumber(influencer.followers) }}</span>
+              <span class="stat-label">Abonnés</span>
+            </div>
+            <div class="stat">
+              <span class="stat-value">{{ influencer.engagementRate }}%</span>
+              <span class="stat-label">Taux d'engagement</span>
+            </div>
+          </div>
+          
+          <div class="contact-info">
+            <p v-if="influencer.email">📧 {{ influencer.email }}</p>
+            <p v-if="influencer.phone">📞 {{ influencer.phone }}</p>
           </div>
         </div>
       </div>
-
-      <!-- Bouton Modifier -->
-      <div v-if="canEdit" class="text-right">
-        <button
-          @click="goToEdit"
-          class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-        >
-          Modifier le profil
-        </button>
+      
+      <div class="profile-details">
+        <div class="bio-section">
+          <h2>À propos</h2>
+          <p>{{ influencer.bio }}</p>
+        </div>
+        
+        <div class="social-section" v-if="hasSocialLinks">
+          <h2>Réseaux sociaux</h2>
+          <div class="social-links">
+            <a 
+              v-if="influencer.socialMedia.instagram" 
+              :href="influencer.socialMedia.instagram" 
+              target="_blank" 
+              class="social-link"
+            >
+              📷 Instagram
+            </a>
+            <a 
+              v-if="influencer.socialMedia.twitter" 
+              :href="influencer.socialMedia.twitter" 
+              target="_blank" 
+              class="social-link"
+            >
+              🐦 Twitter
+            </a>
+            <a 
+              v-if="influencer.socialMedia.facebook" 
+              :href="influencer.socialMedia.facebook" 
+              target="_blank" 
+              class="social-link"
+            >
+              📘 Facebook
+            </a>
+            <a 
+              v-if="influencer.socialMedia.youtube" 
+              :href="influencer.socialMedia.youtube" 
+              target="_blank" 
+              class="social-link"
+            >
+              📹 YouTube
+            </a>
+            <a 
+              v-if="influencer.socialMedia.tiktok" 
+              :href="influencer.socialMedia.tiktok" 
+              target="_blank" 
+              class="social-link"
+            >
+              📱 TikTok
+            </a>
+          </div>
+        </div>
+      </div>
+      
+      <div class="back-link">
+        <router-link to="/" class="btn">← Retour à l'accueil</router-link>
       </div>
     </div>
 
-    <div v-else>
-      <p>Profil introuvable.</p>
+    <!-- Ajout d'un message si aucun influenceur n'est trouvé -->
+    <div v-else class="not-found">
+      <p>Influenceur non trouvé</p>
+      <router-link to="/" class="btn">Retour à l'accueil</router-link>
     </div>
   </div>
 </template>
+
+<script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
+import { useInfluencerStore } from '@/stores/influencers' // Chemin corrigé
+
+const route = useRoute()
+const influencerStore = useInfluencerStore()
+
+const loading = ref(false)
+const error = ref('')
+
+const influencer = computed(() => influencerStore.currentInfluencer)
+
+const hasSocialLinks = computed(() => {
+  if (!influencer.value || !influencer.value.socialMedia) return false
+  const socials = influencer.value.socialMedia
+  return socials.instagram || socials.twitter || socials.facebook || socials.youtube || socials.tiktok
+})
+
+onMounted(async () => {
+  const influencerId = route.params.id as string
+  if (influencerId) {
+    loading.value = true
+    try {
+      await influencerStore.fetchInfluencerById(influencerId)
+    } catch (err: any) {
+      error.value = err.message || 'Erreur lors du chargement du profil'
+    } finally {
+      loading.value = false
+    }
+  }
+})
+
+const formatNumber = (num: number) => {
+  if (num >= 1000000) {
+    return (num / 1000000).toFixed(1) + 'M'
+  } else if (num >= 1000) {
+    return (num / 1000).toFixed(1) + 'K'
+  }
+  return num.toString()
+}
+</script>
+
+<style scoped>
+.influencer-profile {
+  min-height: 70vh;
+  padding: 2rem 0;
+}
+
+.loading, .error, .not-found {
+  text-align: center;
+  padding: 3rem;
+  font-size: 1.2rem;
+}
+
+.error {
+  color: #dc3545;
+}
+
+.not-found {
+  color: #6c757d;
+}
+
+.profile-header {
+  display: flex;
+  gap: 2rem;
+  margin-bottom: 2rem;
+  align-items: center;
+}
+
+.profile-image {
+  flex-shrink: 0;
+}
+
+.profile-image img {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 4px solid #fff;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.profile-info h1 {
+  margin: 0 0 0.5rem 0;
+  color: #2c3e50;
+}
+
+.category {
+  color: #7f8c8d;
+  font-style: italic;
+  margin: 0 0 1rem 0;
+}
+
+.stats {
+  display: flex;
+  gap: 2rem;
+  margin: 1.5rem 0;
+}
+
+.stat {
+  text-align: center;
+}
+
+.stat-value {
+  display: block;
+  font-weight: bold;
+  font-size: 1.5rem;
+  color: #2c3e50;
+}
+
+.stat-label {
+  font-size: 0.9rem;
+  color: #7f8c8d;
+}
+
+.contact-info p {
+  margin: 0.5rem 0;
+  color: #34495e;
+}
+
+.profile-details {
+  margin-bottom: 2rem;
+}
+
+.bio-section, .social-section {
+  margin-bottom: 2rem;
+}
+
+.bio-section h2, .social-section h2 {
+  color: #2c3e50;
+  margin-bottom: 1rem;
+  border-bottom: 2px solid #ecf0f1;
+  padding-bottom: 0.5rem;
+}
+
+.bio-section p {
+  line-height: 1.6;
+  color: #34495e;
+}
+
+.social-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.social-link {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  background: #3498db;
+  color: white;
+  text-decoration: none;
+  border-radius: 4px;
+  transition: background-color 0.3s;
+}
+
+.social-link:hover {
+  background: #2980b9;
+}
+
+.back-link {
+  text-align: center;
+  margin-top: 2rem;
+}
+
+@media (max-width: 768px) {
+  .profile-header {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .stats {
+    justify-content: center;
+  }
+  
+  .social-links {
+    flex-direction: column;
+  }
+}
+</style>

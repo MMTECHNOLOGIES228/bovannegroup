@@ -1,36 +1,34 @@
-
-
 // src/router/index.ts
 import { createRouter, createWebHistory } from "vue-router";
-// import HomePublic from "@/pages/HomePublic.vue";
-// import LoginForm from "@/components/Auth/LoginForm.vue";
-// import AdminDashboard from "@/pages/AdminDashboard.vue";
-// import InfluencerProfile from "@/pages/InfluencerProfile.vue";
-// import InfluencerRegister from "@/components/Auth/InfluencerRegister.vue";
-// import { useAuthStore } from "@/stores/auth";
+import HomePublic from "@/pages/HomePublic.vue";
+import LoginForm from "@/components/Auth/LoginForm.vue";
+import AdminDashboard from "@/pages/AdminDashboard.vue";
+import InfluencerProfile from "@/pages/InfluencerProfile.vue";
+import InfluencerRegister from "@/pages/InfluencerRegister.vue"; // Changé depuis components/Auth
+import { useAuthStore } from "@/stores/auth";
 import PublicLayout from "@/layouts/PublicLayout.vue";
 import AdminLayout from "@/layouts/AdminLayout.vue";
-
 
 const routes = [
     {
         path: "/",
         component: PublicLayout,
-        // children: [
-        //     { path: "", name: "home", component: HomePublic },
-        //     { path: "login", name: "login", component: LoginForm },
-        //     { path: "register", name: "register", component: InfluencerRegister },
-        //     { path: "influencer/:id", name: "influencer.profile", component: InfluencerProfile, props: true },
-        // ],
+        children: [
+            { path: "", name: "home", component: HomePublic },
+            { path: "login", name: "login", component: LoginForm },
+            { path: "register", name: "register", component: InfluencerRegister },
+            { path: "profile/:id", name: "influencer.profile", component: InfluencerProfile, props: true },
+        ],
     },
     {
         path: "/admin",
         component: AdminLayout,
-        // meta: { requiresAuth: true, requiresAdmin: true },
-        // children: [
-        //     { path: "", name: "admin", component: AdminDashboard },
-        //     { path: "influencer/:id/edit", name: "admin.influencer.edit", component: () => import("@/pages/AdminInfluencerEdit.vue"), meta: { requiresAuth: true } },
-        // ],
+        meta: { requiresAuth: true },
+        children: [
+            { path: "", name: "admin.dashboard", component: AdminDashboard },
+            { path: "influencer/new", name: "admin.influencer.new", component: () => import("@/pages/AdminInfluencerEdit.vue") },
+            { path: "influencer/:id/edit", name: "admin.influencer.edit", component: () => import("@/pages/AdminInfluencerEdit.vue"), props: true },
+        ],
     },
 ];
 
@@ -39,16 +37,20 @@ const router = createRouter({
     routes,
 });
 
-// guard
-// router.beforeEach((to, from, next) => {
-//     const auth = useAuthStore();
-//     if (to.meta.requiresAuth && !auth.isAuthenticated) {
-//         return next({ name: "login" });
-//     }
-//     if (to.meta.requiresAdmin && !auth.isAdmin) {
-//         return next({ name: "home" });
-//     }
-//     next();
-// });
+// Garde de navigation
+router.beforeEach((to, from, next) => {
+    const authStore = useAuthStore();
+    
+    // Initialiser le store si ce n'est pas déjà fait
+    if (!authStore.isInitialized) {
+        authStore.init();
+    }
+    
+    if (to.meta.requiresAuth && !authStore.isAuthenticated) {
+        next({ name: "login", query: { redirect: to.fullPath } });
+    } else {
+        next();
+    }
+});
 
 export default router;
